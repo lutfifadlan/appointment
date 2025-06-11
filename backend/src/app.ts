@@ -4,6 +4,8 @@ import cors from 'cors';
 import bodyParser from 'body-parser';
 import websocketService from './services/websocketService';
 import * as lockController from './controllers/lockController';
+import { AppDataSource } from './config/data-source';
+import 'reflect-metadata';
 
 const app = express();
 const port = process.env.PORT || 8088;
@@ -53,8 +55,16 @@ app.use((req: Request, res: Response) => {
 // Initialize WebSocket service
 websocketService.initialize(server);
 
-// Start server
-server.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
-  console.log(`WebSocket server is running`);
-});
+// Initialize TypeORM and start server
+AppDataSource.initialize()
+  .then(() => {
+    console.log("Database connection established");
+    
+    server.listen(port, () => {
+      console.log(`Server is running on port ${port}`);
+      console.log(`WebSocket server is running`);
+    });
+  })
+  .catch((error) => {
+    console.error("Error connecting to database:", error);
+  });

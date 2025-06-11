@@ -1,28 +1,55 @@
 import { AppointmentLock, LockResponse } from '../models/appointmentLock';
 import { v4 as uuidv4 } from 'uuid';
 import websocketService from './websocketService';
+import { AppDataSource } from '../config/data-source';
+import { AppointmentLockEntity } from '../entities/AppointmentLockEntity';
+import { LessThan, MoreThan } from 'typeorm';
 
 class LockService {
-  private locks: Map<string, AppointmentLock> = new Map();
   private lockTimeouts: Map<string, NodeJS.Timeout> = new Map();
   private readonly LOCK_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
+  private lockRepository = AppDataSource.getRepository(AppointmentLockEntity);
+  
+  /**
+   * Helper method to clean up expired locks
+   */
+  private async cleanupExpiredLocks(appointmentId: string): Promise<void> {
+    const now = new Date();
+    await this.lockRepository.delete({
+      appointmentId,
+      expiresAt: LessThan(now)
+    });
+  }
+
+  /**
+   * Convert entity to AppointmentLock interface
+   */
+  private entityToLock(entity: AppointmentLockEntity): AppointmentLock {
+    return {
+      appointmentId: entity.appointmentId,
+      userId: entity.userId,
+      userInfo: entity.userInfo,
+      expiresAt: entity.expiresAt,
+      createdAt: entity.createdAt
+    };
+  }
 
   /**
    * Get the current lock status for an appointment
    */
-  getLockStatus(appointmentId: string): LockResponse {
-    const lock = this.locks.get(appointmentId);
+  async getLockStatus(appointmentId: string): Promise<LockResponse> {
+    // Find lock in database
+    const lock = await this.lockRepository.findOne({
+      where: { 
+        appointmentId,
+        expiresAt: MoreThan(new Date()) // Only get non-expired locks
+      }
+    });
     
     if (!lock) {
-      return {
-        success: true,
-        message: 'Appointment is not locked',
-      };
-    }
-
-    // Check if lock has expired
-    if (new Date() > lock.expiresAt) {
-      this.releaseLock(appointmentId, lock.userId);
+      // Clean up any expired locks
+      await this.cleanupExpiredLocks(appointmentId);
+      
       return {
         success: true,
         message: 'Appointment is not locked',
@@ -32,47 +59,51 @@ class LockService {
     return {
       success: true,
       message: 'Appointment is locked',
-      lock,
+      lock: this.entityToLock(lock),
     };
   }
 
   /**
    * Attempt to acquire a lock on an appointment
    */
-  acquireLock(
+  async acquireLock(
     appointmentId: string,
     userId: string,
     userInfo: { name: string; email: string; position?: { x: number; y: number } }
-  ): LockResponse {
+  ): Promise<LockResponse> {
     // Check if appointment is already locked
-    const existingLock = this.locks.get(appointmentId);
+    const existingLock = await this.lockRepository.findOne({
+      where: { 
+        appointmentId,
+        expiresAt: MoreThan(new Date()) 
+      }
+    });
     
     if (existingLock && existingLock.userId !== userId) {
-      // Check if lock has expired
-      if (new Date() > existingLock.expiresAt) {
-        this.releaseLock(appointmentId, existingLock.userId);
-      } else {
-        return {
-          success: false,
-          message: `Appointment is currently locked by ${existingLock.userInfo.name}`,
-          lock: existingLock,
-        };
-      }
+      return {
+        success: false,
+        message: `Appointment is currently locked by ${existingLock.userInfo.name}`,
+        lock: this.entityToLock(existingLock),
+      };
     }
+
+    // Clean up any expired locks
+    await this.cleanupExpiredLocks(appointmentId);
 
     // Create or update lock
     const now = new Date();
     const expiresAt = new Date(now.getTime() + this.LOCK_EXPIRY_MS);
     
-    const lock: AppointmentLock = {
-      appointmentId,
-      userId,
-      userInfo,
-      expiresAt,
-      createdAt: now,
-    };
-
-    this.locks.set(appointmentId, lock);
+    // Create a new lock entity
+    const lockEntity = new AppointmentLockEntity();
+    lockEntity.appointmentId = appointmentId;
+    lockEntity.userId = userId;
+    lockEntity.userInfo = userInfo;
+    lockEntity.expiresAt = expiresAt;
+    
+    // Save to database
+    const savedLock = await this.lockRepository.save(lockEntity);
+    const lock = this.entityToLock(savedLock);
     
     // Clear any existing timeout for this appointment
     if (this.lockTimeouts.has(appointmentId)) {
@@ -80,8 +111,8 @@ class LockService {
     }
     
     // Set timeout to auto-release lock after expiry
-    const timeout = setTimeout(() => {
-      this.releaseLock(appointmentId, userId);
+    const timeout = setTimeout(async () => {
+      await this.releaseLock(appointmentId, userId);
     }, this.LOCK_EXPIRY_MS);
     
     this.lockTimeouts.set(appointmentId, timeout);
@@ -99,8 +130,10 @@ class LockService {
   /**
    * Release a lock on an appointment
    */
-  releaseLock(appointmentId: string, userId: string): LockResponse {
-    const lock = this.locks.get(appointmentId);
+  async releaseLock(appointmentId: string, userId: string): Promise<LockResponse> {
+    const lock = await this.lockRepository.findOne({
+      where: { appointmentId }
+    });
     
     if (!lock) {
       return {
@@ -115,12 +148,12 @@ class LockService {
       return {
         success: false,
         message: 'You do not have permission to release this lock',
-        lock,
+        lock: this.entityToLock(lock),
       };
     }
 
-    // Release the lock
-    this.locks.delete(appointmentId);
+    // Release the lock by removing it from the database
+    await this.lockRepository.remove(lock);
     
     // Clear the timeout
     if (this.lockTimeouts.has(appointmentId)) {
@@ -140,9 +173,11 @@ class LockService {
   /**
    * Force release a lock (admin only)
    */
-  forceReleaseLock(appointmentId: string, adminId: string): LockResponse {
+  async forceReleaseLock(appointmentId: string, adminId: string): Promise<LockResponse> {
     // In a real application, we would verify that adminId belongs to an admin user
-    const lock = this.locks.get(appointmentId);
+    const lock = await this.lockRepository.findOne({
+      where: { appointmentId }
+    });
     
     if (!lock) {
       return {
@@ -151,8 +186,8 @@ class LockService {
       };
     }
 
-    // Release the lock
-    this.locks.delete(appointmentId);
+    // Release the lock by removing it from the database
+    await this.lockRepository.remove(lock);
     
     // Clear the timeout
     if (this.lockTimeouts.has(appointmentId)) {
@@ -175,12 +210,14 @@ class LockService {
   /**
    * Update user position (for collaborative cursors)
    */
-  updateUserPosition(
+  async updateUserPosition(
     appointmentId: string,
     userId: string,
     position: { x: number; y: number }
-  ): LockResponse {
-    const lock = this.locks.get(appointmentId);
+  ): Promise<LockResponse> {
+    const lock = await this.lockRepository.findOne({
+      where: { appointmentId }
+    });
     
     if (!lock || lock.userId !== userId) {
       return {
@@ -196,13 +233,16 @@ class LockService {
     const now = new Date();
     lock.expiresAt = new Date(now.getTime() + this.LOCK_EXPIRY_MS);
     
+    // Save updated lock to database
+    await this.lockRepository.save(lock);
+    
     // Clear and reset timeout
     if (this.lockTimeouts.has(appointmentId)) {
       clearTimeout(this.lockTimeouts.get(appointmentId)!);
     }
     
-    const timeout = setTimeout(() => {
-      this.releaseLock(appointmentId, userId);
+    const timeout = setTimeout(async () => {
+      await this.releaseLock(appointmentId, userId);
     }, this.LOCK_EXPIRY_MS);
     
     this.lockTimeouts.set(appointmentId, timeout);
@@ -213,7 +253,7 @@ class LockService {
     return {
       success: true,
       message: 'Position updated and lock refreshed',
-      lock,
+      lock: this.entityToLock(lock),
     };
   }
 }
