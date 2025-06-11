@@ -45,30 +45,6 @@ const connectWebSocket = () => {
     // Subscribe to appointment updates
     socket.emit('subscribe', appointmentId);
   });
-  
-  socket.on('lock-update', (data) => {
-    console.log('Lock update received:', data);
-  });
-  
-  socket.on('lock-acquired', (data) => {
-    console.log('Lock acquired:', data);
-  });
-  
-  socket.on('lock-released', (data) => {
-    console.log('Lock released:', data);
-  });
-  
-  socket.on('admin-takeover', (data) => {
-    console.log('Admin takeover:', data);
-  });
-  
-  socket.on('cursor-update', (data) => {
-    console.log('Cursor update:', data);
-  });
-  
-  socket.on('disconnect', () => {
-    console.log('Disconnected from WebSocket server');
-  });
 };
 
 // API functions
@@ -78,7 +54,7 @@ const getLockStatus = async () => {
     console.log('Lock status:', response.data);
     return response.data;
   } catch (error) {
-    console.error('Error getting lock status:', error.response?.data || error.message);
+    console.error('Error getting lock status:', (error as Error).message);
     return null;
   }
 };
@@ -89,7 +65,7 @@ const acquireLock = async (user: typeof user1) => {
     console.log('Acquire lock result:', response.data);
     return response.data;
   } catch (error) {
-    console.error('Error acquiring lock:', error.response?.data || error.message);
+    console.error('Error acquiring lock:', (error as Error).message);
     return null;
   }
 };
@@ -102,7 +78,7 @@ const releaseLock = async (userId: string) => {
     console.log('Release lock result:', response.data);
     return response.data;
   } catch (error) {
-    console.error('Error releasing lock:', error.response?.data || error.message);
+    console.error('Error releasing lock:', (error as Error).message);
     return null;
   }
 };
@@ -115,7 +91,7 @@ const forceReleaseLock = async (adminId: string) => {
     console.log('Force release lock result:', response.data);
     return response.data;
   } catch (error) {
-    console.error('Error force releasing lock:', error.response?.data || error.message);
+    console.error('Error force releasing lock:', (error as Error).message);
     return null;
   }
 };
@@ -129,7 +105,7 @@ const updatePosition = async (userId: string, x: number, y: number) => {
     console.log('Update position result:', response.data);
     return response.data;
   } catch (error) {
-    console.error('Error updating position:', error.response?.data || error.message);
+    console.error('Error updating position:', (error as Error).message);
     return null;
   }
 };
