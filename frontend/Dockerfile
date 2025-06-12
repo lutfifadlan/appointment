@@ -22,7 +22,7 @@ RUN \
   fi
 
 # Remove problematic packages and install stable alternatives
-RUN npm uninstall @tailwindcss/postcss lightningcss
+RUN npm uninstall @tailwindcss/postcss lightningcss || true
 RUN npm install tailwindcss@^3.4.0 postcss@^8.4.0 autoprefixer@^10.4.0
 
 # Rebuild the source code only when needed  
@@ -34,7 +34,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     g++ \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
+
+# Copy the updated node_modules from deps stage
 COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app/package*.json ./
+
+# Copy source code
 COPY . .
 
 # Create a stable tailwind config for v3
@@ -43,10 +48,17 @@ RUN echo 'module.exports = {\n  content: ["./src/**/*.{js,ts,jsx,tsx,mdx}"],\n  
 # Create a stable PostCSS config
 RUN echo 'module.exports = {\n  plugins: {\n    tailwindcss: {},\n    autoprefixer: {},\n  },\n}' > postcss.config.js
 
+# Verify tailwindcss is installed
+RUN ls -la node_modules/.bin/tailwind* || echo "Tailwind not found in .bin"
+RUN npm list tailwindcss || echo "Tailwind not in package list"
+
 # Next.js collects completely anonymous telemetry data about general usage.
 # Learn more here: https://nextjs.org/telemetry
 # Uncomment the following line in case you want to disable telemetry during the build.
 ENV NEXT_TELEMETRY_DISABLED=1
+
+# Ensure next.config.js has proper output configuration
+RUN echo 'const nextConfig = {\n  output: "standalone",\n  experimental: {\n    esmExternals: false\n  }\n};\n\nmodule.exports = nextConfig;' > next.config.js
 
 RUN \
   if [ -f yarn.lock ]; then yarn run build; \
