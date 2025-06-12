@@ -21,8 +21,11 @@ RUN \
   else echo "Lockfile not found." && exit 1; \
   fi
 
+# Remove problematic packages and install stable alternatives
+RUN npm uninstall @tailwindcss/postcss lightningcss
+RUN npm install tailwindcss@^3.4.0 postcss@^8.4.0 autoprefixer@^10.4.0
 
-# Rebuild the source code only when needed
+# Rebuild the source code only when needed  
 FROM base AS builder
 # Install build tools in builder stage too
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -34,8 +37,11 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# Rebuild native modules for the current platform
-RUN npm rebuild lightningcss
+# Create a stable tailwind config for v3
+RUN echo 'module.exports = {\n  content: ["./src/**/*.{js,ts,jsx,tsx,mdx}"],\n  theme: { extend: {} },\n  plugins: [],\n}' > tailwind.config.js
+
+# Create a stable PostCSS config
+RUN echo 'module.exports = {\n  plugins: {\n    tailwindcss: {},\n    autoprefixer: {},\n  },\n}' > postcss.config.js
 
 # Next.js collects completely anonymous telemetry data about general usage.
 # Learn more here: https://nextjs.org/telemetry
