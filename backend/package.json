@@ -16,15 +16,12 @@
     "test:coverage": "cross-env NODE_ENV=test jest --coverage",
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix",
-
     "migration:generate": "npx typeorm migration:generate src/migrations/AutoMigration -d src/config/data-source.ts",
     "migration:create": "npx typeorm migration:create src/migrations/NewMigration",
     "migration:run": "npx typeorm migration:run -d src/config/data-source.ts",
     "migration:revert": "npx typeorm migration:revert -d src/config/data-source.ts",
-    
     "db:drop": "npx typeorm schema:drop -d src/config/data-source.ts",
     "db:sync": "npx typeorm schema:sync -d src/config/data-source.ts",
-
     "prepare": "husky install"
   },
   "keywords": [],
@@ -48,7 +45,7 @@
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
     "@types/jest": "^29.5.14",
-    "@types/node": "^24.0.0",
+    "@types/node": "^24.0.1",
     "@types/pg": "^8.10.9",
     "@types/socket.io": "^3.0.1",
     "@types/uuid": "^10.0.0",
@@ -56,9 +53,9 @@
     "cross-env": "^7.0.3",
     "eslint": "^8.46.0",
     "husky": "^8.0.0",
+    "jest": "^29.7.0",
     "lint-staged": "^16.0.0",
     "prettier": "^3.5.3",
-    "jest": "^29.7.0",
     "rimraf": "^5.0.10",
     "supertest": "^6.3.3",
     "ts-jest": "^29.1.1",

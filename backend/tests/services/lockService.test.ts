@@ -23,10 +23,8 @@ jest.mock('../../src/services/websocketService', () => ({
   default: mockWebsocketService
 }));
 
-// Mock setTimeout and clearTimeout
+// No need to mock timers anymore as we're using database for expiry
 jest.useFakeTimers();
-const spySetTimeout = jest.spyOn(global, 'setTimeout');
-const spyClearTimeout = jest.spyOn(global, 'clearTimeout');
 
 // Import after mocks are set up
 let lockService: any;
@@ -49,9 +47,7 @@ describe('LockService', () => {
     mockWebsocketService.notifyAdminTakeover.mockReset();
     mockWebsocketService.notifyLockChange.mockReset();
     
-    // Reset timer spies
-    spySetTimeout.mockClear();
-    spyClearTimeout.mockClear();
+    // No need to reset timer spies anymore
     
     // Import the service fresh for each test
     lockService = require('../../src/services/lockService').default;
@@ -188,9 +184,6 @@ describe('LockService', () => {
         userInfo: { name: 'User One', email: 'user1@example.com' }
       });
       
-      // Verify timeout was set
-      expect(spySetTimeout).toHaveBeenCalledWith(expect.any(Function), 5 * 60 * 1000);
-      
       // Verify websocket notification
       expect(mockWebsocketService.notifyLockAcquired).toHaveBeenCalledWith(
         'appointment1',
@@ -243,9 +236,6 @@ describe('LockService', () => {
           position: { x: 10, y: 20 }
         }
       });
-      
-      // Verify timeout was reset
-      expect(setTimeout).toHaveBeenCalledWith(expect.any(Function), 5 * 60 * 1000);
       
       // Verify websocket notification
       expect(mockWebsocketService.notifyLockAcquired).toHaveBeenCalled();
@@ -460,8 +450,7 @@ describe('LockService', () => {
         }
       });
       
-      // Verify timeout was reset
-      expect(setTimeout).toHaveBeenCalledWith(expect.any(Function), 5 * 60 * 1000);
+      // No need to verify timeout anymore as we're using database for expiry
     });
   });
 });
