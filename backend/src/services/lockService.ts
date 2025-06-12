@@ -1,5 +1,4 @@
 import { AppointmentLock, LockResponse } from '../models/appointmentLock';
-import { v4 as uuidv4 } from 'uuid';
 import websocketService from './websocketService';
 import { AppDataSource } from '../config/data-source';
 import { AppointmentLockEntity } from '../entities/AppointmentLockEntity';

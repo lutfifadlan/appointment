@@ -8,7 +8,7 @@ class WebSocketService {
   // Map of appointmentId to array of connected client socket IDs
   private appointmentSubscriptions: Map<string, Set<string>> = new Map();
 
-  initialize(server: Server) {
+  initialize(server: Server): void {
     this.io = new SocketIOServer(server, {
       cors: {
         origin: '*', // In production, restrict this to your frontend domain
@@ -48,10 +48,11 @@ class WebSocketService {
         userId: string;
         position: { x: number; y: number };
       }) => {
+        const { appointmentId, userId, position } = data;
         // Broadcast cursor position to all clients subscribed to this appointment
-        socket.to(`appointment:${data.appointmentId}`).emit('cursor-update', {
-          userId: data.userId,
-          position: data.position
+        socket.to(`appointment:${appointmentId}`).emit('cursor-update', {
+          userId,
+          position
         });
       });
 
@@ -60,9 +61,10 @@ class WebSocketService {
         console.log(`Client disconnected: ${socket.id}`);
         
         // Remove socket from all subscriptions
-        this.appointmentSubscriptions.forEach((subscribers, appointmentId) => {
+        this.appointmentSubscriptions.forEach((subscribers, roomId) => {
           if (subscribers.has(socket.id)) {
             subscribers.delete(socket.id);
+            console.log(`Removed client ${socket.id} from appointment ${roomId}`);
           }
         });
       });
@@ -70,7 +72,7 @@ class WebSocketService {
   }
 
   // Notify all clients subscribed to an appointment about lock changes
-  notifyLockChange(appointmentId: string, lock: AppointmentLock | null) {
+  notifyLockChange(appointmentId: string, lock: AppointmentLock | null): void {
     if (!this.io) {
       console.error('WebSocket server not initialized');
       return;
@@ -83,7 +85,7 @@ class WebSocketService {
   }
 
   // Notify about lock acquisition
-  notifyLockAcquired(appointmentId: string, lock: AppointmentLock) {
+  notifyLockAcquired(appointmentId: string, lock: AppointmentLock): void {
     if (!this.io) {
       console.error('WebSocket server not initialized');
       return;
@@ -96,7 +98,7 @@ class WebSocketService {
   }
 
   // Notify about lock release
-  notifyLockReleased(appointmentId: string) {
+  notifyLockReleased(appointmentId: string): void {
     if (!this.io) {
       console.error('WebSocket server not initialized');
       return;
@@ -108,7 +110,7 @@ class WebSocketService {
   }
 
   // Notify about admin takeover
-  notifyAdminTakeover(appointmentId: string, adminId: string, adminInfo: { name: string; email: string }) {
+  notifyAdminTakeover(appointmentId: string, adminId: string, adminInfo: { name: string; email: string }): void {
     if (!this.io) {
       console.error('WebSocket server not initialized');
       return;

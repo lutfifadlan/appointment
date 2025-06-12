@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import lockService from '../services/lockService';
 
-export const getLockStatus = async (req: Request, res: Response) => {
+export const getLockStatus = async (req: Request, res: Response): Promise<Response | void> => {
   try {
     const { id } = req.params;
     const response = await lockService.getLockStatus(id);
@@ -15,7 +15,7 @@ export const getLockStatus = async (req: Request, res: Response) => {
   }
 };
 
-export const acquireLock = async (req: Request, res: Response) => {
+export const acquireLock = async (req: Request, res: Response): Promise<Response | void> => {
   try {
     const { id } = req.params;
     const { userId, userInfo } = req.body;
@@ -43,7 +43,7 @@ export const acquireLock = async (req: Request, res: Response) => {
   }
 };
 
-export const releaseLock = async (req: Request, res: Response) => {
+export const releaseLock = async (req: Request, res: Response): Promise<Response | void> => {
   try {
     const { id } = req.params;
     const { userId } = req.body;
@@ -71,7 +71,7 @@ export const releaseLock = async (req: Request, res: Response) => {
   }
 };
 
-export const forceReleaseLock = async (req: Request, res: Response) => {
+export const forceReleaseLock = async (req: Request, res: Response): Promise<Response | void> => {
   try {
     const { id } = req.params;
     const { adminId } = req.body;
@@ -100,7 +100,7 @@ export const forceReleaseLock = async (req: Request, res: Response) => {
   }
 };
 
-export const updateUserPosition = async (req: Request, res: Response) => {
+export const updateUserPosition = async (req: Request, res: Response): Promise<Response | void> => {
   try {
     const { id } = req.params;
     const { userId, position } = req.body;

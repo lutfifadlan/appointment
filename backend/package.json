@@ -17,13 +17,13 @@
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix",
 
-    "migration:generate": "npx typeorm migration:generate src/migrations/AutoMigration -d src/data-source.ts",
+    "migration:generate": "npx typeorm migration:generate src/migrations/AutoMigration -d src/config/data-source.ts",
     "migration:create": "npx typeorm migration:create src/migrations/NewMigration",
-    "migration:run": "npx typeorm migration:run -d src/data-source.ts",
-    "migration:revert": "npx typeorm migration:revert -d src/data-source.ts",
+    "migration:run": "npx typeorm migration:run -d src/config/data-source.ts",
+    "migration:revert": "npx typeorm migration:revert -d src/config/data-source.ts",
     
-    "db:drop": "npx typeorm schema:drop -d src/data-source.ts",
-    "db:sync": "npx typeorm schema:sync -d src/data-source.ts",
+    "db:drop": "npx typeorm schema:drop -d src/config/data-source.ts",
+    "db:sync": "npx typeorm schema:sync -d src/config/data-source.ts",
 
     "prepare": "husky install"
   },
