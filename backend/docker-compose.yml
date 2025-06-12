@@ -1,34 +1,54 @@
+version: '3.8'
+
 services:
   app:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
-      - "8088:8088"
+      - "${PORT:-8088}:${PORT:-8088}"
     depends_on:
       - postgres
     environment:
-      - NODE_ENV=development
-      - DB_HOST=postgres
-      - DB_PORT=5432
-      - DB_USERNAME=postgres
-      - DB_PASSWORD=postgres
-      - DB_NAME=appointment_db
+      - NODE_ENV=${NODE_ENV:-development}
+      - PORT=${PORT:-8088}
+      - DB_HOST=${DB_HOST:-postgres}
+      - DB_PORT=${DB_PORT:-5432}
+      - DB_USERNAME=${DB_USERNAME:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD:-postgres}
+      - DB_NAME=${DB_NAME:-appointment_db}
+      - DB_URL=${DB_URL:-}
     volumes:
       - ./src:/app/src
+      - ./dist:/app/dist
+      - ./.env:/app/.env
+      - ./.env.prod:/app/.env.prod
     networks:
       - appointment-network
+    command: >
+      sh -c "if [ "$NODE_ENV" = "production" ]; then
+              npm run prod;
+            else
+              npm run dev;
+            fi"
 
   postgres:
     image: postgres:14-alpine
     ports:
-      - "5432:5432"
+      - "${DB_PORT:-5432}:5432"
     environment:
-      - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=appointment_db
+      - POSTGRES_USER=${DB_USERNAME:-postgres}
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-postgres}
+      - POSTGRES_DB=${DB_NAME:-appointment_db}
     volumes:
       - postgres-data:/var/lib/postgresql/data
     networks:
       - appointment-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 networks:
   appointment-network:

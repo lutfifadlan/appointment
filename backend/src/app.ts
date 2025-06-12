@@ -2,6 +2,23 @@ import express, { Request, Response, NextFunction } from 'express';
 import http from 'http';
 import cors from 'cors';
 import bodyParser from 'body-parser';
+import path from 'path';
+import fs from 'fs';
+import dotenv from 'dotenv';
+
+// Load environment variables based on NODE_ENV
+const NODE_ENV = process.env.NODE_ENV || 'development';
+const envFile = NODE_ENV === 'production' ? '.env.prod' : '.env';
+const envPath = path.resolve(process.cwd(), envFile);
+
+if (fs.existsSync(envPath)) {
+  console.log(`Loading environment from ${envFile}`);
+  dotenv.config({ path: envPath });
+} else {
+  console.log(`Environment file ${envFile} not found, using default environment variables`);
+  dotenv.config();
+}
+
 import websocketService from './services/websocketService';
 import * as lockController from './controllers/lockController';
 import { AppDataSource } from './config/data-source';
