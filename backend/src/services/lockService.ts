@@ -2,12 +2,15 @@ import { AppointmentLock, LockResponse } from '../models/appointmentLock';
 import websocketService from './websocketService';
 import { AppDataSource } from '../config/data-source';
 import { AppointmentLockEntity } from '../entities/AppointmentLockEntity';
-import { LessThan, MoreThan } from 'typeorm';
+import { LessThan, MoreThan, Repository } from 'typeorm';
 
 class LockService {
-  private lockTimeouts: Map<string, NodeJS.Timeout> = new Map();
   private readonly LOCK_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
-  private lockRepository = AppDataSource.getRepository(AppointmentLockEntity);
+  private lockRepository: Repository<AppointmentLockEntity>;
+
+  constructor() {
+    this.lockRepository = AppDataSource.getRepository(AppointmentLockEntity);
+  }
   
   /**
    * Helper method to clean up expired locks
@@ -93,29 +96,29 @@ class LockService {
     const now = new Date();
     const expiresAt = new Date(now.getTime() + this.LOCK_EXPIRY_MS);
     
-    // Create a new lock entity
-    const lockEntity = new AppointmentLockEntity();
-    lockEntity.appointmentId = appointmentId;
-    lockEntity.userId = userId;
-    lockEntity.userInfo = userInfo;
-    lockEntity.expiresAt = expiresAt;
+    // If there's an existing lock by the same user, update it
+    let lockEntity: AppointmentLockEntity;
     
-    // Save to database
-    const savedLock = await this.lockRepository.save(lockEntity);
-    const lock = this.entityToLock(savedLock);
-    
-    // Clear any existing timeout for this appointment
-    if (this.lockTimeouts.has(appointmentId)) {
-      clearTimeout(this.lockTimeouts.get(appointmentId)!);
+    if (existingLock) {
+      existingLock.expiresAt = expiresAt;
+      if (userInfo) {
+        existingLock.userInfo = userInfo;
+      }
+      lockEntity = await this.lockRepository.save(existingLock);
+    } else {
+      // Create a new lock entity
+      lockEntity = new AppointmentLockEntity();
+      lockEntity.appointmentId = appointmentId;
+      lockEntity.userId = userId;
+      lockEntity.userInfo = userInfo;
+      lockEntity.expiresAt = expiresAt;
+      
+      // Save to database
+      lockEntity = await this.lockRepository.save(lockEntity);
     }
     
-    // Set timeout to auto-release lock after expiry
-    const timeout = setTimeout(async () => {
-      await this.releaseLock(appointmentId, userId);
-    }, this.LOCK_EXPIRY_MS);
+    const lock = this.entityToLock(lockEntity);
     
-    this.lockTimeouts.set(appointmentId, timeout);
-
     // Notify clients about the lock acquisition
     websocketService.notifyLockAcquired(appointmentId, lock);
 
@@ -153,12 +156,6 @@ class LockService {
 
     // Release the lock by removing it from the database
     await this.lockRepository.remove(lock);
-    
-    // Clear the timeout
-    if (this.lockTimeouts.has(appointmentId)) {
-      clearTimeout(this.lockTimeouts.get(appointmentId)!);
-      this.lockTimeouts.delete(appointmentId);
-    }
 
     // Notify clients about the lock release
     websocketService.notifyLockReleased(appointmentId);
@@ -187,12 +184,6 @@ class LockService {
 
     // Release the lock by removing it from the database
     await this.lockRepository.remove(lock);
-    
-    // Clear the timeout
-    if (this.lockTimeouts.has(appointmentId)) {
-      clearTimeout(this.lockTimeouts.get(appointmentId)!);
-      this.lockTimeouts.delete(appointmentId);
-    }
 
     // Notify clients about the admin takeover
     websocketService.notifyAdminTakeover(appointmentId, adminId, { 
@@ -234,17 +225,6 @@ class LockService {
     
     // Save updated lock to database
     await this.lockRepository.save(lock);
-    
-    // Clear and reset timeout
-    if (this.lockTimeouts.has(appointmentId)) {
-      clearTimeout(this.lockTimeouts.get(appointmentId)!);
-    }
-    
-    const timeout = setTimeout(async () => {
-      await this.releaseLock(appointmentId, userId);
-    }, this.LOCK_EXPIRY_MS);
-    
-    this.lockTimeouts.set(appointmentId, timeout);
 
     // We don't need to notify about position updates here
     // as the client will send these directly via WebSocket
