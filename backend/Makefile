@@ -1,48 +1,190 @@
-.PHONY: build up down restart logs clean ps migrate
+DOCKER_COMPOSE = docker compose -f docker-compose.local.yml
+APP_CONTAINER = appointment-app-1
+DB_CONTAINER = appointment-postgres-1
+NODE_IMAGE = node:22-alpine
 
-# Build and start containers
-up:
-	docker-compose up -d
+.DEFAULT_GOAL := help
 
-# Build containers
-build:
-	docker-compose build
+.PHONY: help
+help: ## Show this help message
+	@echo "Appointment - Available Commands"
+	@echo "================================"
+	@echo "install              Install npm dependencies"
+	@echo "dev                  Start development server with hot reload"
+	@echo "build                Build the TypeScript application"
+	@echo "clean                Clean build artifacts"
+	@echo "start                Start the production application locally"
+	@echo "t                    Run tests"
+	@echo "tw                   Run tests in watch mode"
+	@echo "tc                   Run tests with coverage report"
+	@echo "lint                 Run ESLint"
+	@echo "lint-fix             Run ESLint with auto-fix"
+	@echo "up                   Start all services with Docker Compose"
+	@echo "down                 Stop all services and remove containers"
+	@echo "rst                  Restart all services"
+	@echo "logs                 Show logs for all services"
+	@echo "logs-app             Show logs for app service only"
+	@echo "logs-db              Show logs for database service only"
+	@echo "shell-app            Open shell in app container"
+	@echo "shell-db             Open MySQL shell in database container"
+	@echo "ps                   Show running containers"
+	@echo "prune                Remove containers, networks, volumes, and images"
+	@echo "m-up                 Run database migrations"
+	@echo "m-down               Undo last database migration"
+	@echo "drop                 Drop all database tables (WARNING: destroys all data)"
+	@echo "db-create            Create database if it doesn't exist"
+	@echo "db-seed              Seed database with initial data"
+	@echo "setup                Complete project setup (start services, migrate, seed)"
+	@echo "dev-setup            Setup for local development (no Docker)"
+	@echo "full-reset           Full project reset (clean Docker, restart)"
+	@echo "test                 Run tests"
+	@echo "check                Run all code quality checks"
 
-# Stop containers
-down:
-	docker-compose down
+.PHONY: install
+install: ## Install npm dependencies
+	@echo "Installing dependencies..."
+	npm ci
 
-# Restart containers
-restart:
-	docker-compose restart
+.PHONY: dev
+dev: ## Start development server with hot reload
+	@echo "Starting development server..."
+	npm run dev:watch
 
-# View logs
-logs:
-	docker-compose logs -f
+.PHONY: build
+build: ## Build the TypeScript application
+	@echo "Building application..."
+	npm run build
 
-# View running containers
-ps:
-	docker-compose ps
+.PHONY: clean
+clean: ## Clean build artifacts
+	@echo "Cleaning build artifacts..."
+	npm run clean
 
-# Clean up containers and volumes
-clean:
-	docker-compose down -v
+.PHONY: start
+start: ## Start the production application locally
+	@echo "Starting production server..."
+	npm start
 
-# Run TypeORM migrations
-migrate:
-	docker-compose exec app npm run migration:run
+.PHONY: t
+t: ## Run tests
+	@echo "Running tests..."
+	npm test
 
-# Generate TypeORM migration
-migration-generate:
-	docker-compose exec app npm run migration:generate -- migrations/$(name)
+.PHONY: tw
+tw: ## Run tests in watch mode
+	@echo "Running tests in watch mode..."
+	npm run test:watch
 
-# Enter app container shell
-shell:
-	docker-compose exec app sh
+.PHONY: tc
+tc: ## Run tests with coverage report
+	@echo "Running tests with coverage..."
+	npm run test:coverage
 
-# Enter database container shell
-db-shell:
-	docker-compose exec postgres psql -U postgres -d appointment_db
+.PHONY: lint
+lint: ## Run ESLint
+	@echo "Running linter..."
+	npm run lint
 
-# Default target
-all: build up
+.PHONY: lint-fix
+lint-fix: ## Run ESLint with auto-fix
+	@echo "Running linter with auto-fix..."
+	npm run lint:fix
+
+.PHONY: up
+up: ## Start all services with Docker Compose
+	@echo "Starting services with Docker Compose..."
+	$(DOCKER_COMPOSE) up --build -d
+
+.PHONY: down
+down: ## Stop all services and remove containers
+	@echo "Stopping services..."
+	$(DOCKER_COMPOSE) down
+
+.PHONY: rst
+rst: down up ## Restart all services
+
+.PHONY: logs
+logs: ## Show logs for all services
+	@echo "Showing logs..."
+	$(DOCKER_COMPOSE) logs -f
+
+.PHONY: logs-app
+logs-app: ## Show logs for app service only
+	@echo "Showing app logs..."
+	$(DOCKER_COMPOSE) logs -f app
+
+.PHONY: logs-db
+logs-db: ## Show logs for database service only
+	@echo "Showing database logs..."
+	$(DOCKER_COMPOSE) logs -f mysqldb
+
+.PHONY: shell-app
+shell-app: ## Open shell in app container
+	@echo "Opening shell in app container..."
+	$(DOCKER_COMPOSE) exec app sh
+
+.PHONY: shell-db
+shell-db: ## Open MySQL shell in database container
+	@echo "Opening MySQL shell..."
+	$(DOCKER_COMPOSE) exec mysqldb mysql -u root -p
+
+.PHONY: ps
+ps: ## Show running containers
+	@echo "Running containers:"
+	$(DOCKER_COMPOSE) ps
+
+.PHONY: prune
+prune: ## Remove containers, networks, volumes, and images
+	@echo "Cleaning up Docker resources..."
+	$(DOCKER_COMPOSE) down -v --rmi all --remove-orphans
+	docker system prune -f
+
+.PHONY: m-up
+m-up: ## Run database migrations
+	@echo "Running database migrations..."
+	$(DOCKER_COMPOSE) exec app npm run migrate
+
+.PHONY: m-down
+m-down: ## Undo last database migration
+	@echo "Undoing last migration..."
+	$(DOCKER_COMPOSE) exec app npm run migrate:undo
+
+.PHONY: drop
+drop: ## Drop all database tables (WARNING: destroys all data)
+	@echo "Dropping all database tables - all data will be lost!"
+	$(DOCKER_COMPOSE) exec app npm run db:drop:tables
+	@echo "All tables dropped successfully"
+
+.PHONY: db-create
+db-create: ## Create database if it doesn't exist
+	@echo "Creating database if it doesn't exist..."
+	$(DOCKER_COMPOSE) exec app npm run db:create
+	@echo "Database created or already exists"
+
+.PHONY: db-seed
+db-seed: ## Seed database with initial data
+	@echo "Seeding database..."
+	$(DOCKER_COMPOSE) exec app npm run db:seed
+
+.PHONY: setup
+setup: up m-up db-seed ## Complete project setup (start services, migrate, seed)
+	@echo "Project setup complete!"
+	@echo "Your API should be available at: http://localhost:8080"
+
+.PHONY: dev-setup
+dev-setup: install build ## Setup for local development (no Docker)
+	@echo "Development setup complete!"
+	@echo "Run 'make dev' to start development server"
+
+.PHONY: full-reset
+full-reset: drop prune up m-up db-seed ## Full project reset (clean Docker, restart)
+	@echo "Full reset complete!"
+
+.PHONY: test
+test: ## Run tests
+	@echo "Running tests..."
+	npm test
+
+.PHONY: check
+check: lint test ## Run all code quality checks
+	@echo "All checks passed!"

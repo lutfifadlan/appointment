@@ -1,0 +1,20 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Run lint-staged to check staged files
+npx lint-staged
+
+# Run tests with coverage and check if coverage is above threshold
+echo "Running tests with coverage threshold check..."
+
+# Use the npm script that uses Jest's coverage threshold configuration from package.json
+npm run test:coverage
+
+# The command above will exit with non-zero code if coverage is below threshold
+if [ $? -ne 0 ]; then
+  echo "\033[0;31mTest coverage is below 50%. Commit rejected.\033[0m"
+  echo "Please improve test coverage before committing."
+  exit 1
+else
+  echo "\033[0;32mTest coverage is above 50%. Proceeding with commit.\033[0m"
+fi
