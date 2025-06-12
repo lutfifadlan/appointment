@@ -24,12 +24,18 @@ RUN \
 
 # Rebuild the source code only when needed
 FROM base AS builder
+# Install build tools in builder stage too
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3 \
+    make \
+    g++ \
+    && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Rebuild native modules for the current platform
-RUN npm rebuild
+RUN npm rebuild lightningcss
 
 # Next.js collects completely anonymous telemetry data about general usage.
 # Learn more here: https://nextjs.org/telemetry
