@@ -27,6 +27,10 @@ app.get('/', (req: Request, res: Response) => {
   res.send('Appointment backend root endpoint');
 });
 
+app.get('/health', (req: Request, res: Response) => {
+  res.send('OK');
+});
+
 // Lock routes
 app.get('/api/appointments/:id/lock-status', lockController.getLockStatus);
 app.post('/api/appointments/:id/acquire-lock', lockController.acquireLock);
