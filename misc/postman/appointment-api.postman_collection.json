@@ -1,0 +1,425 @@
+{
+	"info": {
+		"_postman_id": "3c914ee0-bb4c-4ccb-aeb1-5e80c18b3571",
+		"name": "Appointment API",
+		"description": "API collection for the Appointment application",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "456772"
+	},
+	"item": [
+		{
+			"name": "Appointments",
+			"item": [
+				{
+					"name": "Get All Appointments",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{api_base_url}}/appointments",
+							"host": [
+								"{{api_base_url}}"
+							],
+							"path": [
+								"appointments"
+							]
+						},
+						"description": "Retrieve all appointments"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Appointments by Date Range",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{api_base_url}}/appointments/date-range?startDate=2025-06-01&endDate=2025-06-30",
+							"host": [
+								"{{api_base_url}}"
+							],
+							"path": [
+								"appointments",
+								"date-range"
+							],
+							"query": [
+								{
+									"key": "startDate",
+									"value": "2025-06-01",
+									"description": "Start date in YYYY-MM-DD format"
+								},
+								{
+									"key": "endDate",
+									"value": "2025-06-30",
+									"description": "End date in YYYY-MM-DD format"
+								}
+							]
+						},
+						"description": "Retrieve appointments within a specified date range"
+					},
+					"response": []
+				},
+				{
+					"name": "Get Appointment by ID",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{api_base_url}}/appointments/:id",
+							"host": [
+								"{{api_base_url}}"
+							],
+							"path": [
+								"appointments",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "c3eb7169-df3f-425e-bebc-17804eba3124",
+									"description": "Appointment ID"
+								}
+							]
+						},
+						"description": "Retrieve a specific appointment by ID"
+					},
+					"response": []
+				},
+				{
+					"name": "Create Appointment",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"Doctor Appointment\",\n  \"description\": \"Annual checkup\",\n  \"startDate\": \"2025-06-15T10:00:00Z\",\n  \"endDate\": \"2025-06-15T11:00:00Z\",\n  \"userId\": \"user123\",\n  \"location\": \"Medical Center\"\n}"
+						},
+						"url": {
+							"raw": "{{api_base_url}}/appointments",
+							"host": [
+								"{{api_base_url}}"
+							],
+							"path": [
+								"appointments"
+							]
+						},
+						"description": "Create a new appointment"
+					},
+					"response": []
+				},
+				{
+					"name": "Update Appointment",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"title\": \"Updated Doctor Appointment\",\n  \"description\": \"Rescheduled annual checkup\",\n  \"startTime\": \"2025-06-16T14:00:00Z\",\n  \"endTime\": \"2025-06-16T15:00:00Z\",\n  \"userId\": \"user123\",\n  \"location\": \"Medical Center\"\n}"
+						},
+						"url": {
+							"raw": "{{api_base_url}}/appointments/:id",
+							"host": [
+								"{{api_base_url}}"
+							],
+							"path": [
+								"appointments",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "c3eb7169-df3f-425e-bebc-17804eba3124",
+									"description": "Appointment ID"
+								}
+							]
+						},
+						"description": "Update an existing appointment"
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Appointment",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{api_base_url}}/appointments/:id",
+							"host": [
+								"{{api_base_url}}"
+							],
+							"path": [
+								"appointments",
+								":id"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "c3eb7169-df3f-425e-bebc-17804eba3124",
+									"description": "Appointment ID"
+								}
+							]
+						},
+						"description": "Delete an appointment"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Lock Management",
+			"item": [
+				{
+					"name": "Get Lock Status",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{api_base_url}}/appointments/:id/lock-status",
+							"host": [
+								"{{api_base_url}}"
+							],
+							"path": [
+								"appointments",
+								":id",
+								"lock-status"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "a08ba04c-6709-43b2-b55d-ee31786d51a4",
+									"description": "Appointment ID"
+								}
+							]
+						},
+						"description": "Get the lock status for an appointment"
+					},
+					"response": []
+				},
+				{
+					"name": "Acquire Lock",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"userId\": \"user123\",\n  \"userInfo\": {\n    \"name\": \"Axel\",\n    \"email\": \"ax@el.com\"\n  }\n}"
+						},
+						"url": {
+							"raw": "{{api_base_url}}/appointments/:id/acquire-lock",
+							"host": [
+								"{{api_base_url}}"
+							],
+							"path": [
+								"appointments",
+								":id",
+								"acquire-lock"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "a08ba04c-6709-43b2-b55d-ee31786d51a4",
+									"description": "Appointment ID"
+								}
+							]
+						},
+						"description": "Acquire a lock on an appointment"
+					},
+					"response": []
+				},
+				{
+					"name": "Release Lock",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"userId\": \"user123\"\n}"
+						},
+						"url": {
+							"raw": "{{api_base_url}}/appointments/:id/release-lock",
+							"host": [
+								"{{api_base_url}}"
+							],
+							"path": [
+								"appointments",
+								":id",
+								"release-lock"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "a08ba04c-6709-43b2-b55d-ee31786d51a4",
+									"description": "Appointment ID"
+								}
+							]
+						},
+						"description": "Release a lock on an appointment"
+					},
+					"response": []
+				},
+				{
+					"name": "Force Release Lock",
+					"request": {
+						"method": "DELETE",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"adminId\": \"admin123\"\n}"
+						},
+						"url": {
+							"raw": "{{api_base_url}}/appointments/:id/force-release-lock",
+							"host": [
+								"{{api_base_url}}"
+							],
+							"path": [
+								"appointments",
+								":id",
+								"force-release-lock"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "a08ba04c-6709-43b2-b55d-ee31786d51a4",
+									"description": "Appointment ID"
+								}
+							]
+						},
+						"description": "Force release a lock (admin only)"
+					},
+					"response": []
+				},
+				{
+					"name": "Update User Position",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"userId\": \"user123\",\n  \"position\": {\n    \"x\": 100,\n    \"y\": 200\n  }\n}"
+						},
+						"url": {
+							"raw": "{{api_base_url}}/appointments/:id/update-position",
+							"host": [
+								"{{api_base_url}}"
+							],
+							"path": [
+								"appointments",
+								":id",
+								"update-position"
+							],
+							"variable": [
+								{
+									"key": "id",
+									"value": "a08ba04c-6709-43b2-b55d-ee31786d51a4",
+									"description": "Appointment ID"
+								}
+							]
+						},
+						"description": "Update user position for collaborative cursors"
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "System",
+			"item": [
+				{
+					"name": "Root Endpoint",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								""
+							]
+						},
+						"description": "Root endpoint of the API"
+					},
+					"response": []
+				},
+				{
+					"name": "Health Check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{base_url}}/health",
+							"host": [
+								"{{base_url}}"
+							],
+							"path": [
+								"health"
+							]
+						},
+						"description": "Health check endpoint"
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"packages": {},
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:8088",
+			"type": "string"
+		}
+	]
+}

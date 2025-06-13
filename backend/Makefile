@@ -3,6 +3,9 @@ APP_CONTAINER = appointment-app-1
 DB_CONTAINER = appointment-postgres-1
 NODE_IMAGE = node:22-alpine
 
+# Production environment file
+PROD_ENV_FILE = .env.prod
+
 .DEFAULT_GOAL := help
 
 .PHONY: help
@@ -29,8 +32,11 @@ help: ## Show this help message
 	@echo "shell-db             Open PostgreSQL shell in database container"
 	@echo "ps                   Show running containers"
 	@echo "prune                Remove containers, networks, volumes, and images"
-	@echo "m-up                 Run database migrations"
-	@echo "m-down               Undo last database migration"
+	@echo "m-up                 Run database migrations locally"
+	@echo "m-down               Undo last database migration locally"
+	@echo "prod-m-up            Run database migrations in production"
+	@echo "prod-m-down          Undo last database migration in production"
+	@echo "prod-m-status        Check status of migrations in production"
 	@echo "drop                 Drop all database tables (WARNING: destroys all data)"
 	@echo "db-create            Create database if it doesn't exist"
 	@echo "db-seed              Seed database with initial data"
@@ -188,3 +194,35 @@ test: ## Run tests
 .PHONY: check
 check: lint test ## Run all code quality checks
 	@echo "All checks passed!"
+
+.PHONY: prod-m-up
+prod-m-up: ## Run database migrations in production
+	@echo "Running database migrations in production..."
+	@if [ ! -f "$(PROD_ENV_FILE)" ]; then \
+		echo "Error: Production environment file $(PROD_ENV_FILE) not found"; \
+		exit 1; \
+	fi
+	@echo "Using production environment from $(PROD_ENV_FILE)"
+	env $(shell cat $(PROD_ENV_FILE) | grep -v '^#' | xargs) npm run migration:run
+	@echo "Production database migrations completed successfully"
+
+.PHONY: prod-m-down
+prod-m-down: ## Undo last database migration in production
+	@echo "Undoing last migration in production..."
+	@if [ ! -f "$(PROD_ENV_FILE)" ]; then \
+		echo "Error: Production environment file $(PROD_ENV_FILE) not found"; \
+		exit 1; \
+	fi
+	@echo "Using production environment from $(PROD_ENV_FILE)"
+	env $(shell cat $(PROD_ENV_FILE) | grep -v '^#' | xargs) npm run migration:revert
+	@echo "Last migration in production has been reverted"
+
+.PHONY: prod-m-status
+prod-m-status: ## Check status of migrations in production
+	@echo "Checking migration status in production..."
+	@if [ ! -f "$(PROD_ENV_FILE)" ]; then \
+		echo "Error: Production environment file $(PROD_ENV_FILE) not found"; \
+		exit 1; \
+	fi
+	@echo "Using production environment from $(PROD_ENV_FILE)"
+	env $(shell cat $(PROD_ENV_FILE) | grep -v '^#' | xargs) npx typeorm migration:show -d src/config/data-source.ts
