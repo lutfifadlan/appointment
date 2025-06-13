@@ -1,0 +1,19 @@
+{
+  "id": "appointment-api-environments",
+  "name": "Appointment API Environments",
+  "values": [
+    {
+      "key": "local",
+      "value": "http://localhost:8088",
+      "type": "default",
+      "enabled": true
+    },
+    {
+      "key": "production",
+      "value": "https://appointment.lutfifadlan.com",
+      "type": "default",
+      "enabled": true
+    }
+  ],
+  "_postman_variable_scope": "environment"
+}

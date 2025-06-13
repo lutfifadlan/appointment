@@ -1,6 +1,7 @@
 import "reflect-metadata";
 import { DataSource } from "typeorm";
 import { AppointmentLockEntity } from "../entities/AppointmentLockEntity";
+import { AppointmentEntity } from "../entities/AppointmentEntity";
 
 export const AppDataSource = new DataSource({
   type: "postgres",
@@ -11,7 +12,7 @@ export const AppDataSource = new DataSource({
   database: process.env.DB_NAME || "appointment_db",
   synchronize: process.env.NODE_ENV !== "production",
   logging: process.env.NODE_ENV !== "production",
-  entities: [AppointmentLockEntity],
-  migrations: ["src/migrations/*.ts"],
+  entities: [AppointmentLockEntity, AppointmentEntity],
+  migrations: ["dist/migrations/*.js"],
   subscribers: [],
 });

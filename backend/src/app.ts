@@ -6,6 +6,8 @@ import websocketService from './services/websocketService';
 import * as lockController from './controllers/lockController';
 import { AppDataSource } from './config/data-source';
 import 'reflect-metadata';
+import appointmentRoutes from './routes/appointmentRoutes';
+import lockRoutes from './routes/lockRoutes';
 
 const app = express();
 const port = process.env.PORT || 8088;
@@ -31,15 +33,12 @@ app.get('/health', (req: Request, res: Response) => {
   res.send('OK');
 });
 
-// Lock routes
-app.get('/api/appointments/:id/lock-status', lockController.getLockStatus);
-app.post('/api/appointments/:id/acquire-lock', lockController.acquireLock);
-app.delete('/api/appointments/:id/release-lock', lockController.releaseLock);
-app.delete('/api/appointments/:id/force-release-lock', lockController.forceReleaseLock);
-app.post('/api/appointments/:id/update-position', lockController.updateUserPosition);
+// API Routes
+app.use('/api', appointmentRoutes);
+app.use('/api', lockRoutes);
 
 // Error handling middleware
-app.use((err: Error, req: Request, res: Response, next: NextFunction) => {
+app.use((err: Error, req: Request, res: Response) => {
   console.error(err.stack);
   res.status(500).json({
     success: false,
