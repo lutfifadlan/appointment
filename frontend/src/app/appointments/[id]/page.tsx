@@ -30,7 +30,7 @@ export default function AppointmentPage() {
         
         // In a real app, this would be an API call
         const response = await fetch(`http://localhost:8088/api/appointments/${appointmentId}`);
-        const data = await response.json();
+        await response.json();
         
         // For demo purposes, we'll use mock data
         const mockAppointment: Appointment = {
