@@ -17,10 +17,9 @@
     "test:coverage": "cross-env NODE_ENV=test jest --coverage",
     "lint": "eslint src/**/*.ts",
     "lint:fix": "eslint src/**/*.ts --fix",
-    "migration:generate": "npx typeorm migration:generate src/migrations/AutoMigration -d dist/config/data-source.js",
-    "migration:create": "npx typeorm migration:create src/migrations/NewMigration",
     "migration:run": "npx typeorm migration:run -d dist/config/data-source.js",
     "migration:revert": "npx typeorm migration:revert -d dist/config/data-source.js",
+    "migration:show": "npx typeorm migration:show -d dist/config/data-source.js",
     "db:drop": "npx typeorm schema:drop -d dist/config/data-source.js",
     "db:sync": "npx typeorm schema:sync -d dist/config/data-source.js",
     "prepare": "husky install"

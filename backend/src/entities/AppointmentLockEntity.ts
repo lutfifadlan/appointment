@@ -5,23 +5,23 @@ export class AppointmentLockEntity {
   @PrimaryGeneratedColumn("uuid")
   id!: string;
 
-  @Column()
+  @Column({ name: "appointment_id" })
   @Index()
   appointmentId!: string;
 
-  @Column()
+  @Column({ name: "user_id" })
   userId!: string;
 
-  @Column("jsonb")
+  @Column({ name: "user_info", type: "jsonb" })
   userInfo!: {
     name: string;
     email: string;
     position?: { x: number; y: number };
   };
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: "created_at" })
   createdAt!: Date;
 
-  @Column("timestamp")
+  @Column({ name: "expires_at", type: "timestamp" })
   expiresAt!: Date;
 }

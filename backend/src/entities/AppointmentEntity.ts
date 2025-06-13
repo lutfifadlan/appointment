@@ -11,10 +11,10 @@ export class AppointmentEntity {
   @Column({ nullable: true, type: "text" })
   description?: string;
 
-  @Column("timestamp")
+  @Column({ name: "start_date", type: "timestamp" })
   startDate!: Date;
 
-  @Column("timestamp")
+  @Column({ name: "end_date", type: "timestamp" })
   endDate!: Date;
 
   @Column({
@@ -33,9 +33,9 @@ export class AppointmentEntity {
   @Column("simple-array", { nullable: true })
   attendees?: string[];
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: "created_at" })
   createdAt!: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ name: "updated_at" })
   updatedAt!: Date;
 }

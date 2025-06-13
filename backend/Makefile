@@ -33,14 +33,11 @@ help: ## Show this help message
 	@echo "ps                   Show running containers"
 	@echo "prune                Remove containers, networks, volumes, and images"
 	@echo "m-up                 Run database migrations locally"
-	@echo "m-down               Undo last database migration locally"
+	@echo "m-down               Drop all database tables (WARNING: destroys all data)"
 	@echo "prod-m-up            Run database migrations in production"
-	@echo "prod-m-down          Undo last database migration in production"
+	@echo "prod-m-down          Drop all database tables (WARNING: destroys all data)"
 	@echo "prod-m-status        Check status of migrations in production"
-	@echo "drop                 Drop all database tables (WARNING: destroys all data)"
-	@echo "db-create            Create database if it doesn't exist"
-	@echo "db-seed              Seed database with initial data"
-	@echo "setup                Complete project setup (start services, migrate, seed)"
+	@echo "setup                Complete project setup (start services, migrate)"
 	@echo "dev-setup            Setup for local development (no Docker)"
 	@echo "full-reset           Full project reset (clean Docker, restart)"
 	@echo "test                 Run tests"
@@ -148,32 +145,21 @@ prune: ## Remove containers, networks, volumes, and images
 .PHONY: m-up
 m-up: ## Run database migrations
 	@echo "Running database migrations..."
-	$(DOCKER_COMPOSE) exec app npm run migrate
+	$(DOCKER_COMPOSE) exec app npm run migration:run
 
 .PHONY: m-down
-m-down: ## Undo last database migration
-	@echo "Undoing last migration..."
-	$(DOCKER_COMPOSE) exec app npm run migrate:undo
-
-.PHONY: drop
-drop: ## Drop all database tables (WARNING: destroys all data)
+m-down: ## Drop all database tables (WARNING: destroys all data)
 	@echo "Dropping all database tables - all data will be lost!"
-	$(DOCKER_COMPOSE) exec app npm run db:drop:tables
+	$(DOCKER_COMPOSE) exec app npm run db:drop
 	@echo "All tables dropped successfully"
 
-.PHONY: db-create
-db-create: ## Create database if it doesn't exist
-	@echo "Creating database if it doesn't exist..."
-	$(DOCKER_COMPOSE) exec app npm run db:create
-	@echo "Database created or already exists"
-
-.PHONY: db-seed
-db-seed: ## Seed database with initial data
-	@echo "Seeding database..."
-	$(DOCKER_COMPOSE) exec app npm run db:seed
+.PHONY: m-revert
+m-revert: ## Revert the last migration
+	@echo "Reverting the last migration..."
+	$(DOCKER_COMPOSE) exec app npm run migration:revert
 
 .PHONY: setup
-setup: up m-up db-seed ## Complete project setup (start services, migrate, seed)
+setup: up m-up ## Complete project setup (start services, migrate, seed)
 	@echo "Project setup complete!"
 	@echo "Your API should be available at: http://localhost:8080"
 
@@ -207,15 +193,26 @@ prod-m-up: ## Run database migrations in production
 	@echo "Production database migrations completed successfully"
 
 .PHONY: prod-m-down
-prod-m-down: ## Undo last database migration in production
-	@echo "Undoing last migration in production..."
+prod-m-down: ## Drop all database tables (WARNING: destroys all data)
+	@echo "Dropping all database tables - all data will be lost!"
+	@if [ ! -f "$(PROD_ENV_FILE)" ]; then \
+		echo "Error: Production environment file $(PROD_ENV_FILE) not found"; \
+		exit 1; \
+	fi
+	@echo "Using production environment from $(PROD_ENV_FILE)"
+	env $(shell cat $(PROD_ENV_FILE) | grep -v '^#' | xargs) npm run db:drop
+	@echo "All tables dropped successfully"
+
+.PHONY: prod-m-revert
+prod-m-revert: ## Revert the last migration in production
+	@echo "Reverting the last migration in production..."
 	@if [ ! -f "$(PROD_ENV_FILE)" ]; then \
 		echo "Error: Production environment file $(PROD_ENV_FILE) not found"; \
 		exit 1; \
 	fi
 	@echo "Using production environment from $(PROD_ENV_FILE)"
 	env $(shell cat $(PROD_ENV_FILE) | grep -v '^#' | xargs) npm run migration:revert
-	@echo "Last migration in production has been reverted"
+	@echo "Last migration reverted successfully"
 
 .PHONY: prod-m-status
 prod-m-status: ## Check status of migrations in production
@@ -225,4 +222,4 @@ prod-m-status: ## Check status of migrations in production
 		exit 1; \
 	fi
 	@echo "Using production environment from $(PROD_ENV_FILE)"
-	env $(shell cat $(PROD_ENV_FILE) | grep -v '^#' | xargs) npx typeorm migration:show -d src/config/data-source.ts
+	env $(shell cat $(PROD_ENV_FILE) | grep -v '^#' | xargs) npm run migration:show
