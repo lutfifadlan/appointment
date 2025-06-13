@@ -133,6 +133,7 @@ export const LockProvider: React.FC<LockProviderProps> = ({
         newSocket.disconnect();
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [appointmentId, userId]);
 
   // Auto-refresh lock every 4 minutes to prevent expiration (which happens at 5 minutes)

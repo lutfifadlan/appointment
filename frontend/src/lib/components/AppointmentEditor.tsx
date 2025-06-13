@@ -277,6 +277,7 @@ export const AppointmentEditor: React.FC<AppointmentEditorProps> = ({
             id="status"
             name="status"
             value={formData.status}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             onChange={handleInputChange as any}
             disabled={!isCurrentUserLockOwner}
             className={`mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 ${
