@@ -3,7 +3,7 @@ import { io, Socket } from 'socket.io-client';
 import { AppointmentLock } from '../types/appointment';
 
 // API base URL - should be configured based on environment
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8088/api';
 
 interface LockContextType {
   isLocked: boolean;

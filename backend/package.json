@@ -1,12 +1,13 @@
 {
   "name": "appointment-backend",
   "version": "1.0.0",
+  "type": "commonjs",
   "main": "dist/app.js",
   "types": "dist/types/index.d.ts",
   "scripts": {
-    "build": "npx tsc && npx tsc-alias",
+    "build": "npx tsc",
     "start": "node dist/app.js",
-    "start:dev": "npx tsc && npx tsc-alias && node dist/app.js",
+    "start:dev": "npx tsc && node dist/app.js",
     "dev": "ts-node src/app.ts",
     "dev:watch": "nodemon --exec ts-node src/app.ts",
     "clean": "rimraf dist",

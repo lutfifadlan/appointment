@@ -26,7 +26,7 @@ help: ## Show this help message
 	@echo "logs-app             Show logs for app service only"
 	@echo "logs-db              Show logs for database service only"
 	@echo "shell-app            Open shell in app container"
-	@echo "shell-db             Open MySQL shell in database container"
+	@echo "shell-db             Open PostgreSQL shell in database container"
 	@echo "ps                   Show running containers"
 	@echo "prune                Remove containers, networks, volumes, and images"
 	@echo "m-up                 Run database migrations"
@@ -116,7 +116,7 @@ logs-app: ## Show logs for app service only
 .PHONY: logs-db
 logs-db: ## Show logs for database service only
 	@echo "Showing database logs..."
-	$(DOCKER_COMPOSE) logs -f mysqldb
+	$(DOCKER_COMPOSE) logs -f postgres
 
 .PHONY: shell-app
 shell-app: ## Open shell in app container
@@ -124,9 +124,9 @@ shell-app: ## Open shell in app container
 	$(DOCKER_COMPOSE) exec app sh
 
 .PHONY: shell-db
-shell-db: ## Open MySQL shell in database container
-	@echo "Opening MySQL shell..."
-	$(DOCKER_COMPOSE) exec mysqldb mysql -u root -p
+shell-db: ## Open PostgreSQL shell in database container
+	@echo "Opening PostgreSQL shell..."
+	$(DOCKER_COMPOSE) exec postgres psql -U postgres
 
 .PHONY: ps
 ps: ## Show running containers

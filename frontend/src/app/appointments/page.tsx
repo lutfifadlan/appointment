@@ -20,7 +20,19 @@ export default function AppointmentsPage() {
   
         await new Promise(resolve => setTimeout(resolve, 500));
         
-        setAppointments(data);
+        // Ensure we're setting an array to the state
+        // If data is already an array, use it directly
+        // If data has an appointments property that's an array, use that
+        // Otherwise, default to an empty array
+        if (Array.isArray(data)) {
+          setAppointments(data);
+        } else if (data && Array.isArray(data.appointments)) {
+          setAppointments(data.appointments);
+        } else {
+          console.error('Unexpected API response format:', data);
+          setAppointments([]);
+          setError('Invalid data format received from server');
+        }
       } catch (err) {
         console.error('Error fetching appointments:', err);
         setError('Failed to load appointments');
