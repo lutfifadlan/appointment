@@ -36,6 +36,10 @@ RUN mkdir -p logs && chown -R nodejs:nodejs /app
 # Switch to non-root user
 USER nodejs
 
+# Health check with optimized settings
+HEALTHCHECK --interval=300s --timeout=10s --start-period=40s --retries=3 \
+  CMD curl -f http://localhost:8085/health || exit 1
+
 # production port
 EXPOSE 8085
 
