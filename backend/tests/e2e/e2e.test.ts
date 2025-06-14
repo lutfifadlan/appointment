@@ -1,9 +1,9 @@
-import axios from 'axios';
+import request from 'supertest';
 import { io, Socket } from 'socket.io-client';
-import { describe, beforeAll, beforeEach, afterAll, test, expect } from '@jest/globals';
+import { describe, beforeAll, beforeEach, afterAll, test, expect, jest } from '@jest/globals';
+import { initializeApp } from '../../src/app';
 
-const API_URL = 'http://localhost:8088/api';
-const WS_URL = 'http://localhost:8088';
+let WS_URL: string;
 
 // Test user data
 const user1 = {
@@ -49,11 +49,41 @@ const connectWebSocket = (): Promise<void> => {
   });
 };
 
-// API functions
+let app: any;
+let server: any;
+
+beforeAll(async () => {
+  const initialized = await initializeApp();
+  app = initialized.app;
+  server = initialized.server;
+  const address = server.address();
+  if (typeof address === 'object' && address) {
+    WS_URL = `http://localhost:${address.port}`;
+  } else {
+    throw new Error('Server address not available');
+  }
+  await connectWebSocket();
+  await waitForEvents(1000);
+});
+
+afterAll(async () => {
+  if (socket && socket.connected) {
+    socket.disconnect();
+  }
+  await waitForEvents(500);
+  if (server) {
+    server.close();
+  }
+  await new Promise(resolve => setTimeout(resolve, 1000));
+});
+
+// Replace API_URL with supertest agent
+const api = () => request(app);
+
 const getLockStatus = async () => {
   try {
-    const response = await axios.get(`${API_URL}/appointments/${appointmentId}/lock-status`);
-    return response.data;
+    const response = await api().get(`/api/v1/appointments/${appointmentId}/lock-status`);
+    return response.body;
   } catch (error) {
     return null;
   }
@@ -61,8 +91,8 @@ const getLockStatus = async () => {
 
 const acquireLock = async (user: typeof user1) => {
   try {
-    const response = await axios.post(`${API_URL}/appointments/${appointmentId}/acquire-lock`, user);
-    return response.data;
+    const response = await api().post(`/api/v1/appointments/${appointmentId}/acquire-lock`).send(user);
+    return response.body;
   } catch (error) {
     return null;
   }
@@ -70,10 +100,8 @@ const acquireLock = async (user: typeof user1) => {
 
 const releaseLock = async (userId: string) => {
   try {
-    const response = await axios.delete(`${API_URL}/appointments/${appointmentId}/release-lock`, {
-      data: { userId }
-    });
-    return response.data;
+    const response = await api().delete(`/api/v1/appointments/${appointmentId}/release-lock`).send({ userId });
+    return response.body;
   } catch (error) {
     return null;
   }
@@ -81,10 +109,8 @@ const releaseLock = async (userId: string) => {
 
 const forceReleaseLock = async (adminId: string) => {
   try {
-    const response = await axios.delete(`${API_URL}/appointments/${appointmentId}/force-release-lock`, {
-      data: { adminId }
-    });
-    return response.data;
+    const response = await api().delete(`/api/v1/appointments/${appointmentId}/force-release-lock`).send({ adminId });
+    return response.body;
   } catch (error) {
     return null;
   }
@@ -92,11 +118,8 @@ const forceReleaseLock = async (adminId: string) => {
 
 const updatePosition = async (userId: string, x: number, y: number) => {
   try {
-    const response = await axios.post(`${API_URL}/appointments/${appointmentId}/update-position`, {
-      userId,
-      position: { x, y }
-    });
-    return response.data;
+    const response = await api().post(`/api/v1/appointments/${appointmentId}/update-position`).send({ userId, position: { x, y } });
+    return response.body;
   } catch (error) {
     return null;
   }
@@ -124,12 +147,21 @@ beforeEach(async () => {
 
 // Jest test suite
 describe('Appointment E2E Tests', () => {
+  jest.setTimeout(30000); // Increase timeout for all tests in this suite
   // Setup before all tests
   beforeAll(async () => {
+    const initialized = await initializeApp();
+    app = initialized.app;
+    server = initialized.server;
+    const address = server.address();
+    if (typeof address === 'object' && address) {
+      WS_URL = `http://localhost:${address.port}`;
+    } else {
+      throw new Error('Server address not available');
+    }
     await connectWebSocket();
-    // Wait for connection to establish
     await waitForEvents(1000);
-  });
+  }, 30000); // Increase timeout for beforeAll hook
 
   // Cleanup after all tests
   afterAll(async () => {
