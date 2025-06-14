@@ -11,14 +11,20 @@ export class AppointmentEntity {
   @Column({ nullable: true, type: "text" })
   description?: string;
 
-  @Column({ name: "start_date", type: "timestamp" })
+  @Column({ 
+    name: "start_date", 
+    type: process.env.NODE_ENV === "test" ? "datetime" : "timestamp" 
+  })
   startDate!: Date;
 
-  @Column({ name: "end_date", type: "timestamp" })
+  @Column({ 
+    name: "end_date", 
+    type: process.env.NODE_ENV === "test" ? "datetime" : "timestamp" 
+  })
   endDate!: Date;
 
   @Column({
-    type: "enum",
+    type: process.env.NODE_ENV === "test" ? "text" : "enum",
     enum: ["scheduled", "completed", "cancelled"],
     default: "scheduled"
   })

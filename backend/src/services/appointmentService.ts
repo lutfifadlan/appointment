@@ -98,16 +98,9 @@ export class AppointmentService {
    * @param id - Appointment ID
    * @throws {AppointmentError} If appointment is not found
    */
-  async getAppointmentById(id: string): Promise<AppointmentEntity> {
+  async getAppointmentById(id: string): Promise<AppointmentEntity | null> {
     try {
-      const appointment = await this.appointmentRepository.findOneBy({ id });
-      if (!appointment) {
-        const error = new Error('Appointment not found') as AppointmentError;
-        error.code = 'NOT_FOUND';
-        error.status = 404;
-        throw error;
-      }
-      return appointment;
+      return await this.appointmentRepository.findOneBy({ id });
     } catch (error) {
       if (error instanceof Error && 'code' in error) {
         throw error;

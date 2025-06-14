@@ -24,6 +24,10 @@ export class WebSocketService {
    * @param server - HTTP server instance
    */
   initialize(server: Server): void {
+    if (!server) {
+      throw new Error('Failed to initialize WebSocket server: Invalid server instance');
+    }
+
     try {
       this.io = new SocketIOServer(server, {
         cors: {
@@ -78,6 +82,10 @@ export class WebSocketService {
    * @private
    */
   private handleSubscribe(socket: any, appointmentId: string): void {
+    if (!appointmentId) {
+      return;
+    }
+
     try {
       console.log(`Client ${socket.id} subscribed to appointment ${appointmentId}`);
       
@@ -97,6 +105,10 @@ export class WebSocketService {
    * @private
    */
   private handleUnsubscribe(socket: any, appointmentId: string): void {
+    if (!appointmentId) {
+      return;
+    }
+
     try {
       console.log(`Client ${socket.id} unsubscribed from appointment ${appointmentId}`);
       
@@ -119,6 +131,10 @@ export class WebSocketService {
     userId: string;
     position: CursorPosition;
   }): void {
+    if (!data?.appointmentId || !data?.userId || !data?.position) {
+      return;
+    }
+
     try {
       const { appointmentId, userId, position } = data;
       socket.to(`appointment:${appointmentId}`).emit('cursor-update', {
@@ -153,11 +169,17 @@ export class WebSocketService {
    * Notify clients about lock changes
    */
   notifyLockChange(appointmentId: string, lock: AppointmentLock | null): void {
-    try {
-      if (!this.io) {
-        throw new Error('WebSocket server not initialized');
-      }
+    if (!this.io) {
+      console.error('Failed to notify lock change: WebSocket server not initialized');
+      return;
+    }
 
+    if (!appointmentId) {
+      console.error('Failed to notify lock change: Invalid appointment ID');
+      return;
+    }
+
+    try {
       this.io.to(`appointment:${appointmentId}`).emit('lock-update', {
         appointmentId,
         lock
@@ -171,11 +193,17 @@ export class WebSocketService {
    * Notify clients about lock acquisition
    */
   notifyLockAcquired(appointmentId: string, lock: AppointmentLock): void {
-    try {
-      if (!this.io) {
-        throw new Error('WebSocket server not initialized');
-      }
+    if (!this.io) {
+      console.error('Failed to notify lock acquisition: WebSocket server not initialized');
+      return;
+    }
 
+    if (!appointmentId || !lock) {
+      console.error('Failed to notify lock acquisition: Invalid parameters');
+      return;
+    }
+
+    try {
       this.io.to(`appointment:${appointmentId}`).emit('lock-acquired', {
         appointmentId,
         lock
@@ -189,11 +217,17 @@ export class WebSocketService {
    * Notify clients about lock release
    */
   notifyLockReleased(appointmentId: string): void {
-    try {
-      if (!this.io) {
-        throw new Error('WebSocket server not initialized');
-      }
+    if (!this.io) {
+      console.error('Failed to notify lock release: WebSocket server not initialized');
+      return;
+    }
 
+    if (!appointmentId) {
+      console.error('Failed to notify lock release: Invalid appointment ID');
+      return;
+    }
+
+    try {
       this.io.to(`appointment:${appointmentId}`).emit('lock-released', {
         appointmentId
       });
@@ -206,11 +240,17 @@ export class WebSocketService {
    * Notify clients about admin takeover
    */
   notifyAdminTakeover(appointmentId: string, adminId: string, adminInfo: UserInfo): void {
-    try {
-      if (!this.io) {
-        throw new Error('WebSocket server not initialized');
-      }
+    if (!this.io) {
+      console.error('Failed to notify admin takeover: WebSocket server not initialized');
+      return;
+    }
 
+    if (!appointmentId || !adminId || !adminInfo) {
+      console.error('Failed to notify admin takeover: Invalid parameters');
+      return;
+    }
+
+    try {
       this.io.to(`appointment:${appointmentId}`).emit('admin-takeover', {
         appointmentId,
         adminId,

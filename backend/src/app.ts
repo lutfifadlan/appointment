@@ -13,7 +13,7 @@ import userRoutes from './routes/userRoutes';
 
 const app = express();
 const port = process.env.PORT || 8088;
-const server = http.createServer(app);
+let server: http.Server | null = null;
 
 // Middleware
 app.use(cors());
@@ -62,26 +62,29 @@ app.use((req: Request, res: Response) => {
 // Load environment variables
 dotenv.config();
 
-// Initialize database and start server
-const startServer = async () => {
-  try {
-    await AppDataSource.initialize();
-    console.log('Database connected');
-    
-    // Run migrations
-    await AppDataSource.runMigrations();
-    console.log('Migrations run successfully');
-    
-    // Initialize WebSocket service
-    websocketService.initialize(server);
-    
-    server.listen(port, () => {
-      console.log(`Server is running on port ${port}`);
-    });
-  } catch (error) {
-    console.error('Error during database initialization:', error);
-    process.exit(1);
-  }
+// Exported function to initialize the server and database
+export const initializeApp = async () => {
+  await AppDataSource.initialize();
+  await AppDataSource.runMigrations();
+  server = http.createServer(app);
+  websocketService.initialize(server);
+  return { app, server };
 };
 
-startServer();
+// Export the app for testing
+export { app };
+
+// If run directly, start the server
+if (require.main === module) {
+  (async () => {
+    try {
+      const { server } = await initializeApp();
+      server.listen(port, () => {
+        console.log(`Server is running on port ${port}`);
+      });
+    } catch (error) {
+      console.error('Error during database initialization:', error);
+      process.exit(1);
+    }
+  })();
+}

@@ -1,22 +1,25 @@
 # Dependencies
-/node_modules
+node_modules/
 
 # Build output
-/dist
+dist/
 
 # Environment variables
 .env*
 
 # Logs
-logs
+logs/
 *.log
 npm-debug.log*
 
-# Testing
-/coverage
-
-# Docker
-.dockerignore
-
 # IDE
 .vscode/
+
+# OS
+.DS_Store
+
+# Test coverage
+coverage/
+
+# SQLite test database
+test.sqlite

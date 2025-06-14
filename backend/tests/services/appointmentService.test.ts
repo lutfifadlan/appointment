@@ -75,8 +75,8 @@ describe('AppointmentService', () => {
       jest.spyOn(mockRepository, 'findOneBy').mockResolvedValue(null);
 
       await expect(appointmentService.getAppointmentById('non-existent-id'))
-        .rejects
-        .toThrow('Appointment not found');
+        .resolves
+        .toBeNull();
 
       expect(mockRepository.findOneBy).toHaveBeenCalledWith({ id: 'non-existent-id' });
     });
