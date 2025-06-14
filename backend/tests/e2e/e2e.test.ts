@@ -4,6 +4,9 @@ import { describe, beforeAll, beforeEach, afterAll, test, expect, jest } from '@
 import { initializeApp } from '../../src/app';
 
 let WS_URL: string;
+let app: any;
+let server: any;
+let socket: Socket;
 
 // Test user data
 const user1 = {
@@ -33,9 +36,6 @@ const admin = {
 // Test appointment ID
 const appointmentId = 'appointment123';
 
-// Socket.IO client
-let socket: Socket;
-
 // Connect to WebSocket
 const connectWebSocket = (): Promise<void> => {
   return new Promise((resolve) => {
@@ -49,33 +49,10 @@ const connectWebSocket = (): Promise<void> => {
   });
 };
 
-let app: any;
-let server: any;
-
-beforeAll(async () => {
-  const initialized = await initializeApp();
-  app = initialized.app;
-  server = initialized.server;
-  const address = server.address();
-  if (typeof address === 'object' && address) {
-    WS_URL = `http://localhost:${address.port}`;
-  } else {
-    throw new Error('Server address not available');
-  }
-  await connectWebSocket();
-  await waitForEvents(1000);
-});
-
-afterAll(async () => {
-  if (socket && socket.connected) {
-    socket.disconnect();
-  }
-  await waitForEvents(500);
-  if (server) {
-    server.close();
-  }
-  await new Promise(resolve => setTimeout(resolve, 1000));
-});
+// Helper to wait a bit for WebSocket events to propagate
+const waitForEvents = (ms = 500): Promise<void> => {
+  return new Promise(resolve => setTimeout(resolve, ms));
+};
 
 // Replace API_URL with supertest agent
 const api = () => request(app);
@@ -135,33 +112,39 @@ const sendCursorPosition = (userId: string, x: number, y: number) => {
   }
 };
 
-// Helper to wait a bit for WebSocket events to propagate
-const waitForEvents = (ms = 500): Promise<void> => {
-  return new Promise(resolve => setTimeout(resolve, ms));
-};
-
-// Add a small delay between tests to avoid race conditions
-beforeEach(async () => {
-  await waitForEvents(300);
-});
-
 // Jest test suite
 describe('Appointment E2E Tests', () => {
   jest.setTimeout(30000); // Increase timeout for all tests in this suite
+
   // Setup before all tests
   beforeAll(async () => {
+    // Initialize app and start server
     const initialized = await initializeApp();
     app = initialized.app;
     server = initialized.server;
-    const address = server.address();
-    if (typeof address === 'object' && address) {
-      WS_URL = `http://localhost:${address.port}`;
-    } else {
-      throw new Error('Server address not available');
-    }
+    
+    // Start server on a random port
+    await new Promise<void>((resolve) => {
+      server.listen(0, () => {
+        const address = server.address();
+        if (typeof address === 'object' && address) {
+          WS_URL = `http://localhost:${address.port}`;
+          resolve();
+        } else {
+          throw new Error('Server address not available');
+        }
+      });
+    });
+
+    // Connect WebSocket
     await connectWebSocket();
     await waitForEvents(1000);
-  }, 30000); // Increase timeout for beforeAll hook
+  }, 30000);
+
+  // Add a small delay between tests to avoid race conditions
+  beforeEach(async () => {
+    await waitForEvents(300);
+  });
 
   // Cleanup after all tests
   afterAll(async () => {
@@ -170,12 +153,15 @@ describe('Appointment E2E Tests', () => {
       socket.disconnect();
     }
     
-    // Add a small delay to allow any pending axios requests to complete
+    // Add a small delay to allow any pending requests to complete
     await waitForEvents(500);
     
-    // Instead of process.exit, we'll use a longer timeout to allow connections to close naturally
-    // This helps with the TCPWRAP open handle issue without crashing the Jest worker
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Close server
+    if (server) {
+      await new Promise<void>((resolve) => {
+        server.close(() => resolve());
+      });
+    }
   });
 
   // Test cases
@@ -203,7 +189,7 @@ describe('Appointment E2E Tests', () => {
       expect(true).toBe(true); // Just to have an assertion
     } else {
       expect(result?.success).toBe(false);
-      expect(result?.message).toContain('already locked');
+      expect(result?.message).toContain('Appointment is currently locked by');
     }
   });
 

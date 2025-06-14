@@ -12,7 +12,10 @@ export class AppointmentLockEntity {
   @Column({ name: "user_id" })
   userId!: string;
 
-  @Column({ name: "user_info", type: "jsonb" })
+  @Column({ 
+    name: "user_info", 
+    type: process.env.NODE_ENV === "test" ? "simple-json" : "jsonb"
+  })
   userInfo!: {
     name: string;
     email: string;
@@ -22,6 +25,9 @@ export class AppointmentLockEntity {
   @CreateDateColumn({ name: "created_at" })
   createdAt!: Date;
 
-  @Column({ name: "expires_at", type: "timestamp" })
+  @Column({ 
+    name: "expires_at", 
+    type: process.env.NODE_ENV === "test" ? "datetime" : "timestamp" 
+  })
   expiresAt!: Date;
 }

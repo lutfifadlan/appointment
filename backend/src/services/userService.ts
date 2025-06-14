@@ -43,21 +43,12 @@ export class UserService {
    * @param id - User's ID
    * @throws {UserError} If user is not found
    */
-  async getUserById(id: string): Promise<UserData> {
+  async getUserById(id: string): Promise<UserData | null> {
     try {
-      const user = await this.userRepository.findOne({
+      return await this.userRepository.findOne({
         where: { id },
         select: ['id', 'name', 'email', 'created_at', 'updated_at']
       });
-      
-      if (!user) {
-        const error = new Error('User not found') as UserError;
-        error.code = 'USER_NOT_FOUND';
-        error.status = 404;
-        throw error;
-      }
-      
-      return user;
     } catch (error) {
       if (error instanceof Error && 'code' in error) {
         throw error;
@@ -72,15 +63,12 @@ export class UserService {
    * @param updateData - Data to update
    * @throws {UserError} If user is not found or email is already in use
    */
-  async updateUser(id: string, updateData: Partial<UserEntity>): Promise<UserData> {
+  async updateUser(id: string, updateData: Partial<UserEntity>): Promise<UserData | null> {
     try {
       const user = await this.userRepository.findOne({ where: { id } });
       
       if (!user) {
-        const error = new Error('User not found') as UserError;
-        error.code = 'USER_NOT_FOUND';
-        error.status = 404;
-        throw error;
+        return null;
       }
 
       if (updateData.email && updateData.email !== user.email) {

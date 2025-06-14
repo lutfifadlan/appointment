@@ -90,12 +90,11 @@ describe('UserService', () => {
       expect(result).toEqual(mockUser);
     });
 
-    it('should throw error when user not found', async () => {
+    it('should return null when user not found', async () => {
       jest.spyOn(mockRepository, 'findOne').mockResolvedValue(null);
 
-      await expect(userService.getUserById('non-existent-id'))
-        .rejects
-        .toThrow('User not found');
+      const result = await userService.getUserById('non-existent-id');
+      expect(result).toBeNull();
     });
   });
 
@@ -119,12 +118,11 @@ describe('UserService', () => {
       expect(result).toEqual(expectedResult);
     });
 
-    it('should throw error when user not found', async () => {
+    it('should return null when user not found', async () => {
       jest.spyOn(mockRepository, 'findOne').mockResolvedValue(null);
 
-      await expect(userService.updateUser('non-existent-id', { name: 'New Name' }))
-        .rejects
-        .toThrow('User not found');
+      const result = await userService.updateUser('non-existent-id', { name: 'New Name' });
+      expect(result).toBeNull();
     });
 
     it('should throw error when email is already in use', async () => {
