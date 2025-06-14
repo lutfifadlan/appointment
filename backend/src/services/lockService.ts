@@ -4,12 +4,24 @@ import { AppDataSource } from '../config/data-source';
 import { AppointmentLockEntity } from '../entities/AppointmentLockEntity';
 import { LessThan, MoreThan, Repository } from 'typeorm';
 
-class LockService {
+export interface IWebsocketService {
+  notifyLockAcquired: (appointmentId: string, lock: AppointmentLock) => void;
+  notifyLockReleased: (appointmentId: string) => void;
+  notifyAdminTakeover: (appointmentId: string, adminId: string, adminInfo: { name: string; email: string }) => void;
+  notifyLockChange: (appointmentId: string, lock: AppointmentLock | null) => void;
+}
+
+export class LockService {
   private readonly LOCK_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
   private lockRepository: Repository<AppointmentLockEntity>;
+  private websocketService: IWebsocketService;
 
-  constructor() {
-    this.lockRepository = AppDataSource.getRepository(AppointmentLockEntity);
+  constructor(
+    repository?: Repository<AppointmentLockEntity>,
+    wsService?: IWebsocketService
+  ) {
+    this.lockRepository = repository || AppDataSource.getRepository(AppointmentLockEntity);
+    this.websocketService = wsService || websocketService;
   }
   
   /**
@@ -120,7 +132,7 @@ class LockService {
     const lock = this.entityToLock(lockEntity);
     
     // Notify clients about the lock acquisition
-    websocketService.notifyLockAcquired(appointmentId, lock);
+    this.websocketService.notifyLockAcquired(appointmentId, lock);
 
     return {
       success: true,
@@ -158,7 +170,7 @@ class LockService {
     await this.lockRepository.remove(lock);
 
     // Notify clients about the lock release
-    websocketService.notifyLockReleased(appointmentId);
+    this.websocketService.notifyLockReleased(appointmentId);
 
     return {
       success: true,
@@ -186,7 +198,7 @@ class LockService {
     await this.lockRepository.remove(lock);
 
     // Notify clients about the admin takeover
-    websocketService.notifyAdminTakeover(appointmentId, adminId, { 
+    this.websocketService.notifyAdminTakeover(appointmentId, adminId, { 
       name: 'Admin', // In a real app, we would get the admin's name
       email: 'admin@example.com' // In a real app, we would get the admin's email
     });

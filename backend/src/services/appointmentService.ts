@@ -1,8 +1,6 @@
 import { AppDataSource } from '../config/data-source';
 import { AppointmentEntity } from '../entities/AppointmentEntity';
-import { Between, LessThanOrEqual, MoreThanOrEqual } from 'typeorm';
-
-const appointmentRepository = AppDataSource.getRepository(AppointmentEntity);
+import { Between, LessThanOrEqual, MoreThanOrEqual, Repository } from 'typeorm';
 
 interface AppointmentData {
   title: string;
@@ -15,90 +13,172 @@ interface AppointmentData {
   attendees?: string[];
 }
 
-const appointmentService = {
-  // Create a new appointment
-  async createAppointment(data: AppointmentData): Promise<AppointmentEntity> {
-    const appointment = appointmentRepository.create(data);
-    return await appointmentRepository.save(appointment);
-  },
+interface AppointmentError extends Error {
+  code?: string;
+  status?: number;
+}
 
-  // Get all appointments
-  async getAllAppointments(): Promise<AppointmentEntity[]> {
-    return await appointmentRepository.find({
-      order: {
-        startDate: 'ASC'
-      }
-    });
-  },
+interface ServiceResponse<T> {
+  success: boolean;
+  data?: T;
+  message?: string;
+}
 
-  // Get appointments by date range
-  async getAppointmentsByDateRange(startDate: Date, endDate: Date): Promise<AppointmentEntity[]> {
-    return await appointmentRepository.find({
-      where: [
-        { startDate: Between(startDate, endDate) },
-        { endDate: Between(startDate, endDate) },
-        {
-          startDate: LessThanOrEqual(startDate),
-          endDate: MoreThanOrEqual(endDate)
-        }
-      ],
-      order: {
-        startDate: 'ASC'
-      }
-    });
-  },
+export class AppointmentService {
+  private appointmentRepository: Repository<AppointmentEntity>;
 
-  // Get appointment by ID
-  async getAppointmentById(id: string): Promise<AppointmentEntity | null> {
-    return await appointmentRepository.findOneBy({ id });
-  },
-
-  // Update appointment
-  async updateAppointment(id: string, data: Partial<AppointmentData>): Promise<{
-    success: boolean;
-    appointment?: AppointmentEntity;
-    message?: string;
-  }> {
-    const appointment = await appointmentRepository.findOneBy({ id });
-    
-    if (!appointment) {
-      return {
-        success: false,
-        message: 'Appointment not found'
-      };
-    }
-
-    // Update the appointment with the new data
-    appointmentRepository.merge(appointment, data);
-    const updatedAppointment = await appointmentRepository.save(appointment);
-    
-    return {
-      success: true,
-      appointment: updatedAppointment
-    };
-  },
-
-  // Delete appointment
-  async deleteAppointment(id: string): Promise<{
-    success: boolean;
-    message?: string;
-  }> {
-    const appointment = await appointmentRepository.findOneBy({ id });
-    
-    if (!appointment) {
-      return {
-        success: false,
-        message: 'Appointment not found'
-      };
-    }
-
-    await appointmentRepository.remove(appointment);
-    
-    return {
-      success: true,
-      message: 'Appointment deleted successfully'
-    };
+  constructor() {
+    this.appointmentRepository = AppDataSource.getRepository(AppointmentEntity);
   }
-};
 
-export default appointmentService;
+  /**
+   * Create a new appointment
+   * @param data - Appointment data
+   * @throws {AppointmentError} If appointment creation fails
+   */
+  async createAppointment(data: AppointmentData): Promise<AppointmentEntity> {
+    try {
+      const appointment = this.appointmentRepository.create(data);
+      return await this.appointmentRepository.save(appointment);
+    } catch (error) {
+      console.error('Failed to create appointment:', error);
+      const appError = new Error('Failed to create appointment') as AppointmentError;
+      appError.code = 'CREATE_FAILED';
+      appError.status = 500;
+      throw appError;
+    }
+  }
+
+  /**
+   * Get all appointments
+   * @returns Array of appointments sorted by start date
+   */
+  async getAllAppointments(): Promise<AppointmentEntity[]> {
+    try {
+      return await this.appointmentRepository.find({
+        order: {
+          startDate: 'ASC'
+        }
+      });
+    } catch (error) {
+      console.error('Failed to fetch appointments:', error);
+      throw new Error('Failed to fetch appointments');
+    }
+  }
+
+  /**
+   * Get appointments within a date range
+   * @param startDate - Start date of the range
+   * @param endDate - End date of the range
+   * @returns Array of appointments within the date range
+   */
+  async getAppointmentsByDateRange(startDate: Date, endDate: Date): Promise<AppointmentEntity[]> {
+    try {
+      return await this.appointmentRepository.find({
+        where: [
+          { startDate: Between(startDate, endDate) },
+          { endDate: Between(startDate, endDate) },
+          {
+            startDate: LessThanOrEqual(startDate),
+            endDate: MoreThanOrEqual(endDate)
+          }
+        ],
+        order: {
+          startDate: 'ASC'
+        }
+      });
+    } catch (error) {
+      console.error('Failed to fetch appointments by date range:', error);
+      throw new Error('Failed to fetch appointments by date range');
+    }
+  }
+
+  /**
+   * Get an appointment by ID
+   * @param id - Appointment ID
+   * @throws {AppointmentError} If appointment is not found
+   */
+  async getAppointmentById(id: string): Promise<AppointmentEntity> {
+    try {
+      const appointment = await this.appointmentRepository.findOneBy({ id });
+      if (!appointment) {
+        const error = new Error('Appointment not found') as AppointmentError;
+        error.code = 'NOT_FOUND';
+        error.status = 404;
+        throw error;
+      }
+      return appointment;
+    } catch (error) {
+      if (error instanceof Error && 'code' in error) {
+        throw error;
+      }
+      throw new Error('Failed to fetch appointment');
+    }
+  }
+
+  /**
+   * Update an appointment
+   * @param id - Appointment ID
+   * @param data - Updated appointment data
+   * @throws {AppointmentError} If appointment is not found or update fails
+   */
+  async updateAppointment(id: string, data: Partial<AppointmentData>): Promise<ServiceResponse<AppointmentEntity>> {
+    try {
+      const appointment = await this.appointmentRepository.findOneBy({ id });
+      
+      if (!appointment) {
+        return {
+          success: false,
+          message: 'Appointment not found'
+        };
+      }
+
+      this.appointmentRepository.merge(appointment, data);
+      const updatedAppointment = await this.appointmentRepository.save(appointment);
+      
+      return {
+        success: true,
+        data: updatedAppointment
+      };
+    } catch (error) {
+      console.error('Failed to update appointment:', error);
+      return {
+        success: false,
+        message: 'Failed to update appointment'
+      };
+    }
+  }
+
+  /**
+   * Delete an appointment
+   * @param id - Appointment ID
+   * @throws {AppointmentError} If appointment is not found or deletion fails
+   */
+  async deleteAppointment(id: string): Promise<ServiceResponse<void>> {
+    try {
+      const appointment = await this.appointmentRepository.findOneBy({ id });
+      
+      if (!appointment) {
+        return {
+          success: false,
+          message: 'Appointment not found'
+        };
+      }
+
+      await this.appointmentRepository.remove(appointment);
+      
+      return {
+        success: true,
+        message: 'Appointment deleted successfully'
+      };
+    } catch (error) {
+      console.error('Failed to delete appointment:', error);
+      return {
+        success: false,
+        message: 'Failed to delete appointment'
+      };
+    }
+  }
+}
+
+export default new AppointmentService();
