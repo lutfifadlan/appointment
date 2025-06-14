@@ -2,11 +2,13 @@ import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from 'next/link';
 import { Common, Email, Launch } from '@/constants';
+import CommonLayout from '@/components/common-layout';
 
 const PrivacyPolicy: React.FC = () => {
   return (
-    <div className="container mx-auto py-8">
-      <Card className="max-w-4xl mx-auto">
+    <CommonLayout>
+      <div className="container mx-auto py-8">
+      <Card className="max-w-5xl mx-auto border-none shadow-none dark:bg-background">
         <CardHeader>
           <CardTitle className="text-2xl font-bold">Privacy Policy</CardTitle>
           <p className="text-sm text-gray-500 dark:text-gray-400">Last updated: {Launch.Date}</p>
@@ -141,7 +143,8 @@ const PrivacyPolicy: React.FC = () => {
           </p>
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </CommonLayout>
   );
 };
 

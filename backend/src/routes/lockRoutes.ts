@@ -18,7 +18,4 @@ router.delete('/appointments/:id/force-release-lock', lockController.forceReleas
 // Update user position (for collaborative cursors)
 router.post('/appointments/:id/update-position', lockController.updateUserPosition);
 
-// List of appointments
-router.get('/appointments', lockController.getLockStatus);
-
 export default router;

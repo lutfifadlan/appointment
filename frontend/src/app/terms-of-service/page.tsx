@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { Button } from "@/components/ui/button";
 import { Mail } from 'lucide-react';
 import { Email, Launch } from '@/constants';
+import CommonLayout from '@/components/common-layout';
 
 const TermsOfService: React.FC = () => {
   const terms = [
@@ -76,8 +77,9 @@ const TermsOfService: React.FC = () => {
   ];
 
   return (
-    <div className="container mx-auto py-8">
-      <Card className="max-w-4xl mx-auto">
+    <CommonLayout>
+      <div className="container mx-auto py-8">
+      <Card className="max-w-5xl mx-auto border-none shadow-none dark:bg-background">
         <CardHeader>
           <CardTitle className="text-3xl font-bold">Terms of Service</CardTitle>
           <p className="text-sm text-gray-500 dark:text-gray-400">Last updated: {Launch.Date}</p>
@@ -103,7 +105,8 @@ const TermsOfService: React.FC = () => {
           </div>
         </CardContent>
       </Card>
-    </div>
+      </div>
+    </CommonLayout>
   );
 };
 
