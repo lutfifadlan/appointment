@@ -77,7 +77,7 @@ const ForgetPassword: React.FC = () => {
           <Particles className="h-full w-full" size={0.7} quantity={100} color="#000000"/>
         </div>
         <motion.div 
-          className="z-10 bg-background p-8 rounded-xl w-full max-w-md border border-gray-300 dark:border-gray-700 shadow-[6px_6px_0px_#000] dark:shadow-[6px_6px_0px_#e9ecef]"
+          className="z-10 bg-background p-8 rounded-xl w-full max-w-md border border-gray-300 dark:border-gray-700"
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8 }}

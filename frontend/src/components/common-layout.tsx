@@ -46,7 +46,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen relative">
       {/* Header */}
       <header className="w-full flex justify-between items-center border-b border-gray-200 dark:border-gray-800 px-4 sm:px-6 py-2">
         <Link href="/" className="text-2xl font-bold flex items-center space-x-2">
@@ -143,7 +143,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-gray-200 dark:border-gray-800 w-full pt-2 px-4 sm:px-6 relative z-20">
+      <footer className="border-t border-gray-200 dark:border-gray-800 w-full pt-2 px-4 sm:px-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           {/* Logo and Description Section */}
           <div className="flex flex-col items-center md:items-start">
