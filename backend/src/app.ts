@@ -1,11 +1,10 @@
+import 'reflect-metadata';
 import express, { Request, Response, NextFunction } from 'express';
 import http from 'http';
 import cors from 'cors';
 import bodyParser from 'body-parser';
 import websocketService from './services/websocketService';
-import * as lockController from './controllers/lockController';
 import { AppDataSource } from './config/data-source';
-import 'reflect-metadata';
 import appointmentRoutes from './routes/appointmentRoutes';
 import lockRoutes from './routes/lockRoutes';
 
@@ -34,8 +33,8 @@ app.get('/health', (req: Request, res: Response) => {
 });
 
 // API Routes
-app.use('/api', appointmentRoutes);
-app.use('/api', lockRoutes);
+app.use('/api/v1', appointmentRoutes);
+app.use('/api/v1', lockRoutes);
 
 // Error handling middleware
 app.use((err: Error, req: Request, res: Response) => {
