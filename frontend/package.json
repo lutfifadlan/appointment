@@ -19,6 +19,7 @@
     "@radix-ui/react-select": "^2.2.5",
     "@radix-ui/react-separator": "^1.1.7",
     "@radix-ui/react-slot": "^1.2.3",
+    "@tabler/icons-react": "^3.34.0",
     "appointment-ui": "file:",
     "canvas-confetti": "^1.9.3",
     "class-variance-authority": "^0.7.1",
