@@ -8,7 +8,7 @@ export async function DELETE(
     const body = await request.json();
     const id = (await params).id;
     const response = await fetch(
-      `${process.env.BACKEND_URL}/appointments/${id}/release-lock`,
+      `${process.env.BACKEND_API_URL}/appointments/${id}/release-lock`,
       {
         method: 'DELETE',
         headers: {

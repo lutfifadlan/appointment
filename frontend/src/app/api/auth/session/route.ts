@@ -1,8 +1,6 @@
 import { cookies } from 'next/headers'
 import { NextResponse } from 'next/server'
 
-const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8080'
-
 export async function GET() {
   try {
     const cookieStore = await cookies();
@@ -12,7 +10,7 @@ export async function GET() {
       return NextResponse.json({ error: "No token found" }, { status: 401 });
     }
 
-    const response = await fetch(`${BACKEND_URL}/api/v1/auth/session`, {
+    const response = await fetch(`${process.env.BACKEND_API_URL}/auth/session`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
