@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export async function PUT(request: NextRequest) {
     const cookieStore = await cookies();
-    const token = cookieStore.get("jc_token")?.value;
+    const token = cookieStore.get("sp_token")?.value;
     const body = await request.json();
     const { name, email, password } = body;
 

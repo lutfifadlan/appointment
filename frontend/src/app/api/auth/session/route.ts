@@ -4,7 +4,7 @@ import { NextResponse } from 'next/server'
 export async function GET() {
   try {
     const cookieStore = await cookies();
-    const token = cookieStore.get("jc_token")?.value;
+    const token = cookieStore.get("sp_token")?.value;
 
     if (!token) {
       return NextResponse.json({ error: "No token found" }, { status: 401 });

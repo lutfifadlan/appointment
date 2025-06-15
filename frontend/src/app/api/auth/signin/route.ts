@@ -15,7 +15,7 @@ export async function POST(req: NextRequest) {
     const data = await response.json();
     const res = NextResponse.json(data, { status: response.status });
     if (data.token) {
-      res.cookies.set("jc_token", data.token, {
+      res.cookies.set("sp_token", data.token, {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: process.env.NODE_ENV === 'production' ? "none" : "lax",
