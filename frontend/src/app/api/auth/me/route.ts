@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server';
 
 export async function GET() {
   try {
-    const response = await fetch(`${process.env.BACKEND_URL}/auth/me`, {
+    const response = await fetch(`${process.env.BACKEND_API_URL}/auth/me`, {
       headers: {
         'Content-Type': 'application/json',
       },
