@@ -42,10 +42,7 @@ export class AppointmentService {
       return await this.appointmentRepository.save(appointment);
     } catch (error) {
       console.error('Failed to create appointment:', error);
-      const appError = new Error('Failed to create appointment') as AppointmentError;
-      appError.code = 'CREATE_FAILED';
-      appError.status = 500;
-      throw appError;
+      throw new Error('Failed to create appointment');
     }
   }
 

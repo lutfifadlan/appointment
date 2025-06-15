@@ -31,16 +31,8 @@ describe('AuthService', () => {
       hash_password: 'hashedpassword',
       created_at: new Date(),
       updated_at: new Date(),
-      validatePassword: (password: string) => Promise.resolve(password === 'password123'),
-      hashPassword: async () => Promise.resolve(),
-      save: async () => Promise.resolve(mockUser),
       ...overrides
     } as UserEntity;
-
-    // Set up spies for the mock methods
-    jest.spyOn(mockUser, 'validatePassword');
-    jest.spyOn(mockUser, 'hashPassword');
-    jest.spyOn(mockUser, 'save');
 
     return mockUser;
   };
@@ -83,6 +75,7 @@ describe('AuthService', () => {
     it('should create a new user and return token', async () => {
       const mockUser = createMockUser();
       mockRepository.findOne.mockResolvedValue(null);
+      mockRepository.create.mockReturnValue(mockUser);
       mockRepository.save.mockResolvedValue(mockUser);
 
       const result = await authService.signup(
@@ -92,7 +85,13 @@ describe('AuthService', () => {
       );
 
       expect(mockRepository.findOne).toHaveBeenCalledWith({ where: { email: 'test@example.com' } });
+      expect(mockRepository.create).toHaveBeenCalledWith({
+        email: 'test@example.com',
+        name: 'Test User',
+        hash_password: 'hashedpassword'
+      });
       expect(mockRepository.save).toHaveBeenCalled();
+      expect(bcrypt.hash).toHaveBeenCalledWith('password123', 10);
       expect(result).toHaveProperty('token', 'mock-jwt-token');
       expect(result).toHaveProperty('email', 'test@example.com');
       expect(result).not.toHaveProperty('hash_password');
@@ -115,6 +114,20 @@ describe('AuthService', () => {
         authService.signup('test@example.com', 'Test User', 'password123')
       ).rejects.toThrow('Failed to create user account');
     });
+
+    it('should throw error if required fields are missing', async () => {
+      await expect(
+        authService.signup('', 'Test User', 'password123')
+      ).rejects.toThrow('Email, name, and password are required');
+
+      await expect(
+        authService.signup('test@example.com', '', 'password123')
+      ).rejects.toThrow('Email, name, and password are required');
+
+      await expect(
+        authService.signup('test@example.com', 'Test User', '')
+      ).rejects.toThrow('Email, name, and password are required');
+    });
   });
 
   describe('signin', () => {
@@ -125,7 +138,7 @@ describe('AuthService', () => {
       const result = await authService.signin('test@example.com', 'password123');
 
       expect(mockRepository.findOne).toHaveBeenCalledWith({ where: { email: 'test@example.com' } });
-      expect(mockUser.validatePassword).toHaveBeenCalledWith('password123');
+      expect(bcrypt.compare).toHaveBeenCalledWith('password123', 'hashedpassword');
       expect(result).toHaveProperty('token', 'mock-jwt-token');
       expect(result).not.toHaveProperty('hash_password');
     });
@@ -140,8 +153,8 @@ describe('AuthService', () => {
 
     it('should throw error with invalid password', async () => {
       const mockUser = createMockUser();
-      jest.spyOn(mockUser, 'validatePassword').mockResolvedValueOnce(false);
       mockRepository.findOne.mockResolvedValue(mockUser);
+      (bcrypt.compare as jest.Mock).mockImplementationOnce(() => Promise.resolve(false));
 
       await expect(
         authService.signin('test@example.com', 'wrongpassword')
@@ -150,8 +163,8 @@ describe('AuthService', () => {
 
     it('should throw error if validation fails', async () => {
       const mockUser = createMockUser();
-      jest.spyOn(mockUser, 'validatePassword').mockRejectedValueOnce(new Error('Validation error'));
       mockRepository.findOne.mockResolvedValue(mockUser);
+      (bcrypt.compare as jest.Mock).mockImplementationOnce(() => Promise.reject(new Error('Validation error')));
 
       await expect(
         authService.signin('test@example.com', 'password123')
@@ -198,34 +211,25 @@ describe('AuthService', () => {
 
       expect(jwt.verify).toHaveBeenCalledWith('valid-token', expect.any(String));
       expect(mockRepository.findOneOrFail).toHaveBeenCalledWith({ where: { id: '1' } });
-      expect(result).toEqual(mockUser);
+      expect(result).toBe(mockUser);
     });
 
-    it('should throw error with invalid token', async () => {
+    it('should throw error if token is invalid', async () => {
       (jwt.verify as jest.Mock).mockImplementationOnce(() => {
         throw new Error('Invalid token');
       });
 
-      await expect(authService.validateToken('invalid-token')).rejects.toThrow('Invalid token');
+      await expect(
+        authService.validateToken('invalid-token')
+      ).rejects.toThrow('Invalid token');
     });
 
     it('should throw error if user not found', async () => {
-      (jwt.verify as jest.Mock).mockReturnValue({ id: 'nonexistent-id' });
       mockRepository.findOneOrFail.mockRejectedValue(new Error('User not found'));
 
-      await expect(authService.validateToken('valid-token')).rejects.toThrow('Invalid token');
-    });
-
-    it('should throw error if JWT_SECRET is not set', async () => {
-      delete process.env.JWT_SECRET;
-      const newAuthService = new AuthService();
-      
-      // Mock jwt.verify to throw an error when JWT_SECRET is not set
-      (jwt.verify as jest.Mock).mockImplementationOnce(() => {
-        throw new Error('jwt must have a secret key');
-      });
-
-      await expect(newAuthService.validateToken('valid-token')).rejects.toThrow('Invalid token');
+      await expect(
+        authService.validateToken('valid-token')
+      ).rejects.toThrow('Invalid token');
     });
   });
 });

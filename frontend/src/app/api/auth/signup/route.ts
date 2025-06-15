@@ -4,8 +4,6 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const { name, email, password } = body;
 
-    console.log(process.env.BACKEND_API_URL);
-
     const response = await fetch(`${process.env.BACKEND_API_URL}/auth/signup`, {
         method: "POST",
         headers: {

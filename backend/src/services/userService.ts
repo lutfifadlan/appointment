@@ -10,11 +10,6 @@ interface UserData {
   updated_at: Date;
 }
 
-interface UserError extends Error {
-  code?: string;
-  status?: number;
-}
-
 export class UserService {
   private userRepository: Repository<UserEntity>;
 
@@ -77,10 +72,7 @@ export class UserService {
         });
         
         if (existingUser) {
-          const error = new Error('Email already in use') as UserError;
-          error.code = 'EMAIL_IN_USE';
-          error.status = 409;
-          throw error;
+          throw new Error('Email already in use');
         }
       }
 
@@ -90,7 +82,7 @@ export class UserService {
       const { hash_password, ...result } = updatedUser;
       return result;
     } catch (error) {
-      if (error instanceof Error && 'code' in error) {
+      if (error instanceof Error && (error.message === 'User not found' || error.message === 'Email already in use')) {
         throw error;
       }
       throw new Error('Failed to update user');
@@ -107,16 +99,13 @@ export class UserService {
       const user = await this.userRepository.findOne({ where: { id } });
       
       if (!user) {
-        const error = new Error('User not found') as UserError;
-        error.code = 'USER_NOT_FOUND';
-        error.status = 404;
-        throw error;
+        throw new Error('User not found');
       }
       
       await this.userRepository.remove(user);
       return { message: 'User deleted successfully' };
     } catch (error) {
-      if (error instanceof Error && 'code' in error) {
+      if (error instanceof Error && error.message === 'User not found') {
         throw error;
       }
       throw new Error('Failed to delete user');

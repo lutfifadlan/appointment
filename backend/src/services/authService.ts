@@ -3,6 +3,7 @@ import { UserEntity } from '../entities/UserEntity';
 import * as jwt from 'jsonwebtoken';
 import { Repository } from 'typeorm';
 import { SignOptions } from 'jsonwebtoken';
+import * as bcrypt from 'bcrypt';
 
 interface UserData {
   id: string;
@@ -25,11 +26,31 @@ export class AuthService {
   private userRepository: Repository<UserEntity>;
   private readonly JWT_SECRET: jwt.Secret;
   private readonly JWT_EXPIRES_IN: jwt.SignOptions['expiresIn'];
+  private readonly SALT_ROUNDS = 10;
 
   constructor() {
     this.userRepository = AppDataSource.getRepository(UserEntity);
     this.JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
     this.JWT_EXPIRES_IN = '24h';
+  }
+
+  /**
+   * Hash a password using bcrypt
+   * @param password - Plain text password
+   * @returns Hashed password
+   */
+  private async hashPassword(password: string): Promise<string> {
+    return bcrypt.hash(password, this.SALT_ROUNDS);
+  }
+
+  /**
+   * Validate a password against a hash
+   * @param password - Plain text password
+   * @param hash - Hashed password
+   * @returns Boolean indicating if password matches hash
+   */
+  private async validatePassword(password: string, hash: string): Promise<boolean> {
+    return bcrypt.compare(password, hash);
   }
 
   /**
@@ -41,6 +62,14 @@ export class AuthService {
    */
   async signup(email: string, name: string, password: string): Promise<UserResponse> {
     try {
+      // Validate input
+      if (!email || !name || !password) {
+        const error = new Error('Email, name, and password are required') as AuthError;
+        error.code = 'INVALID_INPUT';
+        error.status = 400;
+        throw error;
+      }
+
       const existingUser = await this.userRepository.findOne({ where: { email } });
       if (existingUser) {
         const error = new Error('Email already in use') as AuthError;
@@ -49,10 +78,12 @@ export class AuthService {
         throw error;
       }
 
-      const user = new UserEntity();
-      user.email = email;
-      user.name = name;
-      user.hash_password = password;
+      const hashedPassword = await this.hashPassword(password);
+      const user = this.userRepository.create({
+        email,
+        name,
+        hash_password: hashedPassword
+      });
 
       const savedUser = await this.userRepository.save(user);
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -63,10 +94,14 @@ export class AuthService {
         token: this.generateToken(savedUser)
       };
     } catch (error) {
-      if (error instanceof Error && 'code' in error) {
+      if (error instanceof Error && (
+        error.message === 'Email already in use' ||
+        error.message === 'Email, name, and password are required'
+      )) {
         throw error;
       }
-      throw new Error('Failed to create user account');
+      console.error('Signup error:', error);
+      throw new Error('Failed to create user account: ' + (error instanceof Error ? error.message : 'Unknown error'));
     }
   }
 
@@ -80,18 +115,12 @@ export class AuthService {
     try {
       const user = await this.userRepository.findOne({ where: { email } });
       if (!user) {
-        const error = new Error('Invalid credentials') as AuthError;
-        error.code = 'INVALID_CREDENTIALS';
-        error.status = 401;
-        throw error;
+        throw new Error('Invalid credentials');
       }
 
-      const isValid = await user.validatePassword(password);
+      const isValid = await this.validatePassword(password, user.hash_password);
       if (!isValid) {
-        const error = new Error('Invalid credentials') as AuthError;
-        error.code = 'INVALID_CREDENTIALS';
-        error.status = 401;
-        throw error;
+        throw new Error('Invalid credentials');
       }
 
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -102,7 +131,7 @@ export class AuthService {
         token: this.generateToken(user)
       };
     } catch (error) {
-      if (error instanceof Error && 'code' in error) {
+      if (error instanceof Error && error.message === 'Invalid credentials') {
         throw error;
       }
       throw new Error('Authentication failed');
@@ -118,17 +147,14 @@ export class AuthService {
     try {
       const user = await this.userRepository.findOne({ where: { id: userId } });
       if (!user) {
-        const error = new Error('User not found') as AuthError;
-        error.code = 'USER_NOT_FOUND';
-        error.status = 404;
-        throw error;
+        throw new Error('User not found');
       }
 
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { hash_password, ...result } = user as UserEntity;
       return result;
     } catch (error) {
-      if (error instanceof Error && 'code' in error) {
+      if (error instanceof Error && error.message === 'User not found') {
         throw error;
       }
       throw new Error('Failed to fetch user data');
@@ -162,10 +188,7 @@ export class AuthService {
       } else {
         console.error('Unknown token validation error');
       }
-      const authError = new Error('Invalid token') as AuthError;
-      authError.code = 'INVALID_TOKEN';
-      authError.status = 401;
-      throw authError;
+      throw new Error('Invalid token');
     }
   }
 }
