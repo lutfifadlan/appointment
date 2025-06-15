@@ -26,7 +26,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const response = await fetch(`${process.env.BACKEND_URL}/appointments`, {
+    const response = await fetch(`${process.env.BACKEND_API_URL}/appointments`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
