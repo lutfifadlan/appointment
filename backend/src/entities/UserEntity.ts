@@ -1,5 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, BeforeInsert } from 'typeorm';
-import * as bcrypt from 'bcrypt';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 
 @Entity('users')
 export class UserEntity {
@@ -20,18 +19,4 @@ export class UserEntity {
 
   @UpdateDateColumn()
   updated_at: Date;
-
-  @BeforeInsert()
-  async hashPassword(): Promise<void> {
-    this.hash_password = await bcrypt.hash(this.hash_password, 10);
-  }
-
-  async validatePassword(password: string): Promise<boolean> {
-    return bcrypt.compare(password, this.hash_password);
-  }
-
-  // Add a save method type for TypeORM
-  async save(): Promise<UserEntity> {
-    return this;
-  }
 }

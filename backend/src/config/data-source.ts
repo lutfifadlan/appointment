@@ -2,6 +2,7 @@ import "reflect-metadata";
 import { DataSource } from "typeorm";
 import { AppointmentLockEntity } from "../entities/AppointmentLockEntity";
 import { AppointmentEntity } from "../entities/AppointmentEntity";
+import { UserEntity } from "../entities/UserEntity";
 import path from "path";
 
 const isTest = process.env.NODE_ENV === "test";
@@ -15,7 +16,7 @@ export const AppDataSource = new DataSource({
   database: isTest ? path.join(__dirname, "../../test.sqlite") : process.env.DB_NAME || "appointment_db",
   synchronize: true, // Always true for tests, controlled by NODE_ENV for other environments
   logging: process.env.NODE_ENV !== "production",
-  entities: [AppointmentLockEntity, AppointmentEntity],
+  entities: [AppointmentLockEntity, AppointmentEntity, UserEntity],
   migrations: ["dist/migrations/*.js"],
   subscribers: [],
 });
