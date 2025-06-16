@@ -59,7 +59,7 @@ export const LockProvider: React.FC<LockProviderProps> = ({
   useEffect(() => {
     if (!appointmentId || disabled) return;
 
-    const newSocket = io(process.env.BACKEND_API_URL);
+    const newSocket = io(process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:8088');
     setSocket(newSocket);
 
     newSocket.on('connect', () => {
@@ -174,7 +174,7 @@ export const LockProvider: React.FC<LockProviderProps> = ({
       if (isCurrentUserLockOwner && appointmentId && userId) {
         // Synchronous API call to release lock before page unload
         navigator.sendBeacon(
-          `${process.env.BACKEND_API_URL}/appointments/${appointmentId}/release-lock`,
+          `${process.env.BACKEND_API_URL || 'http://localhost:8088/api/v1'}/appointments/${appointmentId}/release-lock`,
           JSON.stringify({ userId, expectedVersion: currentVersion })
         );
       }
@@ -234,7 +234,7 @@ export const LockProvider: React.FC<LockProviderProps> = ({
       setLockLoading(true);
       setLockError(null);
       
-      const response = await fetch(`${process.env.BACKEND_API_URL}/appointments/${appointmentId}/acquire-lock`, {
+      const response = await fetch(`/api/appointments/${appointmentId}/acquire-lock`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -293,7 +293,7 @@ export const LockProvider: React.FC<LockProviderProps> = ({
       setLockLoading(true);
       setLockError(null);
       
-      const response = await fetch(`${process.env.BACKEND_API_URL}/appointments/${appointmentId}/release-lock`, {
+      const response = await fetch(`/api/appointments/${appointmentId}/release-lock`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -340,7 +340,7 @@ export const LockProvider: React.FC<LockProviderProps> = ({
       setLockLoading(true);
       setLockError(null);
       
-      const response = await fetch(`${process.env.BACKEND_API_URL}/appointments/${appointmentId}/force-release-lock`, {
+      const response = await fetch(`/api/appointments/${appointmentId}/force-release-lock`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -390,7 +390,7 @@ export const LockProvider: React.FC<LockProviderProps> = ({
       }
       
       // Also update via REST API to refresh lock timeout with optimistic locking
-      const response = await fetch(`${process.env.BACKEND_API_URL}/appointments/${appointmentId}/update-position`, {
+      const response = await fetch(`/api/appointments/${appointmentId}/update-position`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

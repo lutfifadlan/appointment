@@ -66,6 +66,7 @@ export class WebSocketService {
       socket.on('cursor-position', (data: { 
         appointmentId: string;
         userId: string;
+        userInfo?: { name: string; email: string };
         position: CursorPosition;
       }) => {
         this.handleCursorPosition(socket, data);
@@ -129,6 +130,7 @@ export class WebSocketService {
   private handleCursorPosition(socket: any, data: { 
     appointmentId: string;
     userId: string;
+    userInfo?: { name: string; email: string };
     position: CursorPosition;
   }): void {
     if (!data?.appointmentId || !data?.userId || !data?.position) {
@@ -136,9 +138,10 @@ export class WebSocketService {
     }
 
     try {
-      const { appointmentId, userId, position } = data;
+      const { appointmentId, userId, userInfo, position } = data;
       socket.to(`appointment:${appointmentId}`).emit('cursor-update', {
         userId,
+        userInfo: userInfo || { name: 'Unknown User', email: '' },
         position
       });
     } catch (error) {

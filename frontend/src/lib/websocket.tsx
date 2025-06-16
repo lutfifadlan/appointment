@@ -32,7 +32,7 @@ export function WebSocketProvider({ children }: WebSocketProviderProps) {
   });
 
   useEffect(() => {
-    const wsUrl = typeof window !== 'undefined' ? window.location.origin.replace(/^http/, 'ws') : 'ws://localhost:3001';
+    const wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:8088';
     const socketInstance = io(wsUrl, {
       autoConnect: true,
     });

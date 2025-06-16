@@ -132,7 +132,7 @@ export const useAppointmentLock = (appointmentId: string) => {
     };
   }, [socket, appointmentId, sanitizeLockData, recordAttempt]);
 
-  const acquireLock = useCallback(async () => {
+  const acquireLock = useCallback(async (showLoadingToast = true) => {
     if (!user || !canAttemptLock) return false;
     
     if (!checkRateLimit()) return false;
@@ -152,6 +152,10 @@ export const useAppointmentLock = (appointmentId: string) => {
         timestamp: Date.now(),
       };
 
+      if (showLoadingToast) {
+        console.log('🔒 Acquiring lock...', { appointmentId, userId: user.id });
+      }
+
       const response = await fetch(`/api/appointments/${appointmentId}/acquire-lock`, {
         method: 'POST',
         headers: {
@@ -165,13 +169,11 @@ export const useAppointmentLock = (appointmentId: string) => {
       if (!data.success) {
         recordAttempt(false);
         
-        // Handle specific conflict types
+        // Handle specific conflict types with enhanced error messages
         if (data.code === 'LOCK_CONFLICT') {
-          setError(`Lock is currently held by ${data.currentOwner}. Expires in ${data.expiresIn}`);
+          setError(`🔒 Lock is currently held by ${data.currentOwner}. Expires in ${data.expiresIn}`);
         } else if (data.code === 'VERSION_CONFLICT') {
-          setError('Lock state has changed. Please refresh and try again.');
-          // Force refresh lock status
-          fetchLockStatus(appointmentId);
+          setError('🔄 Lock state has changed. Please refresh and try again.');
         } else {
           setError(data.message);
         }
@@ -186,10 +188,14 @@ export const useAppointmentLock = (appointmentId: string) => {
         lockVersionRef.current = data.lock.version;
       }
       
+      if (showLoadingToast) {
+        console.log('✅ Lock acquired successfully', data.lock);
+      }
+      
       return true;
     } catch (error) {
       recordAttempt(false);
-      setError('Network error while acquiring lock');
+      setError('🌐 Network error while acquiring lock');
       console.error('Lock acquisition error:', error);
       return false;
     } finally {

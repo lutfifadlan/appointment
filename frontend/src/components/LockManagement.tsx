@@ -5,19 +5,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
 import { Separator } from './ui/separator';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+
 import { toast } from 'sonner';
 import { 
   Lock, 
   Unlock, 
   Shield, 
-  Users, 
-  Activity, 
   AlertTriangle,
   CheckCircle,
   GitBranch,
   History,
-  MousePointer
+  Crown,
+  Users,
 } from 'lucide-react';
 import {
   AlertDialog,
@@ -31,8 +30,8 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useLock } from '@/lib/contexts/LockContext';
+import { useWebSocket } from '@/lib/websocket';
 import { LockHistory } from './LockHistory';
-import { CollaborativeCursor } from './CollaborativeCursor';
 import { format, formatDistanceToNow } from 'date-fns';
 
 interface LockManagementProps {
@@ -49,7 +48,6 @@ export function LockManagement({
   userId,
   userName,
   userEmail,
-  userColor = '#3b82f6',
   isAdmin = false,
 }: LockManagementProps) {
   const {
@@ -64,12 +62,15 @@ export function LockManagement({
     currentVersion,
     versionConflictCount,
     resetVersionConflict,
-    userCursors
   } = useLock();
 
+  // Add WebSocket takeover functionality
+  const { requestTakeover, forceTakeover } = useWebSocket();
+
   const [showVersionConflictAlert, setShowVersionConflictAlert] = useState(false);
+  const [showTakeoverDialog, setShowTakeoverDialog] = useState(false);
+  const [takeoverLoading, setTakeoverLoading] = useState(false);
   const [lastConflictCount, setLastConflictCount] = useState(0);
-  const [activeTab, setActiveTab] = useState('overview');
 
   // Show version conflict alert when version conflicts occur
   useEffect(() => {
@@ -156,6 +157,57 @@ export function LockManagement({
     toast.info('Version conflict resolved. Please try your action again.');
   };
 
+  // Handle takeover functionality
+  const handleRequestTakeover = useCallback(async () => {
+    if (!selectedAppointmentId) {
+      toast.error('Please select an appointment first');
+      return;
+    }
+
+    if (!isAdmin) {
+      // Non-admin users request control
+      setShowTakeoverDialog(true);
+      return;
+    }
+
+    // Admin force takeover
+    try {
+      setTakeoverLoading(true);
+      await forceTakeover(selectedAppointmentId);
+      toast.success('Administrative takeover successful');
+      setShowTakeoverDialog(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to force takeover';
+      toast.error(message);
+    } finally {
+      setTakeoverLoading(false);
+    }
+  }, [selectedAppointmentId, isAdmin, forceTakeover]);
+
+  const handleConfirmTakeover = useCallback(async () => {
+    if (!selectedAppointmentId) return;
+
+    try {
+      setTakeoverLoading(true);
+      
+      if (isAdmin) {
+        await forceTakeover(selectedAppointmentId);
+        toast.success('Administrative takeover successful');
+      } else {
+        await requestTakeover(selectedAppointmentId);
+        toast.success('Takeover request sent to administrators');
+        toast.info('You will be notified when your request is processed');
+      }
+      
+      setShowTakeoverDialog(false);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to process takeover';
+      toast.error(message);
+    } finally {
+      setTakeoverLoading(false);
+    }
+  }, [selectedAppointmentId, isAdmin, forceTakeover, requestTakeover]);
+
   const getLockStatusColor = () => {
     if (!isLocked) return 'bg-gray-100 text-gray-800 border-gray-200';
     if (isCurrentUserLockOwner) return 'bg-green-100 text-green-800 border-green-200';
@@ -192,9 +244,6 @@ export function LockManagement({
           <ul className="mt-4 space-y-2 text-sm text-muted-foreground">
             <li className="flex items-center justify-center gap-2">
               <Shield className="h-4 w-4" /> Manage lock permissions
-            </li>
-            <li className="flex items-center justify-center gap-2">
-              <Users className="h-4 w-4" /> View collaborative activities
             </li>
             <li className="flex items-center justify-center gap-2">
               <History className="h-4 w-4" /> Track lock history
@@ -333,6 +382,29 @@ export function LockManagement({
                 </AlertDialogContent>
               </AlertDialog>
             )}
+
+            {/* Takeover Control Button */}
+            {isLocked && !isCurrentUserLockOwner && (
+              <Button
+                onClick={handleRequestTakeover}
+                disabled={lockLoading || takeoverLoading}
+                variant={isAdmin ? "destructive" : "secondary"}
+                className="flex items-center gap-2"
+                size="default"
+              >
+                {isAdmin ? (
+                  <>
+                    <Crown className="h-4 w-4" />
+                    {takeoverLoading ? 'Taking Over...' : 'Force Takeover'}
+                  </>
+                ) : (
+                  <>
+                    <Users className="h-4 w-4" />
+                    {takeoverLoading ? 'Requesting...' : 'Request Control'}
+                  </>
+                )}
+              </Button>
+            )}
           </div>
 
           {/* Lock Details */}
@@ -362,113 +434,25 @@ export function LockManagement({
         </CardContent>
       </Card>
 
-      {/* Detailed Tabs */}
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="overview" className="flex items-center gap-2">
-            <Activity className="h-4 w-4" />
-            Overview
-          </TabsTrigger>
-          <TabsTrigger value="collaboration" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            Collaboration
-          </TabsTrigger>
-          <TabsTrigger value="history" className="flex items-center gap-2">
-            <History className="h-4 w-4" />
-            History
-          </TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="overview" className="space-y-4">
-          {/* Live Collaboration Status */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <MousePointer className="h-5 w-5" />
-                Active Collaborators
-              </CardTitle>
-              <CardDescription>
-                Users currently viewing this appointment
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {Object.keys(userCursors).length === 0 ? (
-                <div className="text-center py-8 text-muted-foreground">
-                  <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>No other users are currently active</p>
-                  <p className="text-sm">Collaborators will appear here when they join</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {Object.entries(userCursors).map(([cursorUserId, cursor]) => (
-                    <div key={cursorUserId} className="flex items-center gap-3 p-3 rounded-lg border">
-                      <div 
-                        className="w-4 h-4 rounded-full" 
-                        style={{ backgroundColor: '#3b82f6' }}
-                      />
-                      <div className="flex-1">
-                        <div className="font-medium">{cursor.userInfo.name}</div>
-                        <div className="text-sm text-muted-foreground">{cursor.userInfo.email}</div>
-                      </div>
-                      <Badge variant="outline" className="text-xs">
-                        Active
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="collaboration" className="space-y-4">
-          {/* Collaborative Cursor Component */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <MousePointer className="h-5 w-5" />
-                Live Cursors
-              </CardTitle>
-              <CardDescription>
-                Real-time cursor tracking for collaborative editing
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Cursor Sharing</span>
-                  <Badge variant="outline" className="text-green-600 border-green-600">
-                    <CheckCircle className="h-3 w-3 mr-1" />
-                    Active
-                  </Badge>
-                </div>
-                
-                <CollaborativeCursor
-                  userId={userId}
-                  userName={userName}
-                  userColor={userColor}
-                  appointmentId={selectedAppointmentId}
-                  isEnabled={true}
-                />
-
-                <div className="text-sm text-muted-foreground space-y-1">
-                  <p>• Mouse movements are shared in real-time with other users</p>
-                  <p>• Cursors are only visible when viewing the same appointment</p>
-                  <p>• Automatically cleaned up after 10 seconds of inactivity</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="history" className="space-y-4">
+      {/* Lock History and Statistics */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <History className="h-5 w-5" />
+            Lock History & Statistics
+          </CardTitle>
+          <CardDescription>
+            Track lock activity and view collaboration statistics
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
           <LockHistory 
             appointmentId={selectedAppointmentId}
             autoRefresh={true}
             showStatistics={true}
           />
-        </TabsContent>
-      </Tabs>
+        </CardContent>
+      </Card>
 
       {/* Version Conflict Alert */}
       <AlertDialog open={showVersionConflictAlert} onOpenChange={setShowVersionConflictAlert}>
@@ -489,6 +473,59 @@ export function LockManagement({
             </AlertDialogCancel>
             <AlertDialogAction onClick={handleResolveVersionConflict}>
               Resolve & Retry
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Takeover Confirmation Dialog */}
+      <AlertDialog open={showTakeoverDialog} onOpenChange={setShowTakeoverDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              {isAdmin ? (
+                <>
+                  <Crown className="h-5 w-5 text-red-500" />
+                  Force Takeover Lock
+                </>
+              ) : (
+                <>
+                  <Users className="h-5 w-5 text-blue-500" />
+                  Request Lock Control
+                </>
+              )}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {isAdmin ? (
+                <>
+                  This will immediately remove the lock from{' '}
+                  <strong>{currentLock?.userInfo.name}</strong> and grant it to you.
+                  This action cannot be undone and the current user will lose
+                  any unsaved changes.
+                </>
+              ) : (
+                <>
+                  This will send a request to administrators to take control
+                  of this appointment from <strong>{currentLock?.userInfo.name}</strong>.
+                  You will be notified when your request is processed.
+                </>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={takeoverLoading}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmTakeover}
+              disabled={takeoverLoading}
+              className={isAdmin ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90' : ''}
+            >
+              {takeoverLoading ? (
+                isAdmin ? 'Forcing Takeover...' : 'Sending Request...'
+              ) : (
+                isAdmin ? 'Force Takeover' : 'Send Request'
+              )}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

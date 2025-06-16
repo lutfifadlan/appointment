@@ -33,7 +33,7 @@ export function LockHistory({
 }: LockHistoryProps) {
   const [filterAction, setFilterAction] = useState<string>('all');
   const [searchTerm, setSearchTerm] = useState('');
-  const [showExpanded, setShowExpanded] = useState(false);
+  const [showExpanded, setShowExpanded] = useState(true);
   
   const {
     history,

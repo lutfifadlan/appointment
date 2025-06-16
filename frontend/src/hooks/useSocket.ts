@@ -13,8 +13,7 @@ export const useSocket = () => {
 
     try {
       // Initialize socket connection
-      socketRef.current = io(process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:3001', {
-        withCredentials: true,
+      socketRef.current = io(process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:8088', {
         reconnectionAttempts: 3,
         reconnectionDelay: 1000,
         timeout: 5000,

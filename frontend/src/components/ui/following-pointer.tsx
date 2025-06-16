@@ -46,7 +46,7 @@ export const FollowerPointerCard = ({
       onMouseEnter={handleMouseEnter}
       onMouseMove={handleMouseMove}
       style={{
-        cursor: "none",
+        cursor: "auto",
       }}
       ref={ref}
       className={cn("relative", className)}

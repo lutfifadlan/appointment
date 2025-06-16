@@ -15,6 +15,12 @@ import { AppointmentCRUD } from "@/components/AppointmentCRUD";
 import { LockManagement } from "@/components/LockManagement";
 import { LockProvider } from "@/lib/contexts/LockContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { RealtimeAppointmentEditor } from "@/components/RealtimeAppointmentEditor";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { useSocket } from "@/hooks/useSocket";
+import { Wifi, WifiOff, Edit3, ArrowLeft } from "lucide-react";
 
 interface Appointment {
   id: string;
@@ -35,6 +41,7 @@ export default function Dashboard() {
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [activeTab, setActiveTab] = useState("appointments");
   const { user, isAdmin } = useAuth();
+  const { isConnected } = useSocket();
 
   // Generate user color for collaborative features
   const userColor = React.useMemo(() => {
@@ -63,9 +70,25 @@ export default function Dashboard() {
     fetchSession();
   }, [router]);
 
-  const handleAppointmentSelect = (appointment: Appointment) => {
+
+
+  const handleRealtimeEdit = (appointment: Appointment) => {
+    console.log('handleRealtimeEdit called with:', appointment.title);
+    console.log('Current activeTab before change:', activeTab);
     setSelectedAppointment(appointment);
-    setActiveTab("locks"); // Switch to lock management when appointment is selected
+    setActiveTab("realtime");
+    console.log('Set activeTab to: realtime');
+  };
+
+  const handleExitRealtimeEdit = () => {
+    setActiveTab("appointments");
+  };
+
+  const handleRealtimeSave = async (data: unknown) => {
+    // Implement save logic here
+    console.log('Saving appointment data:', data);
+    // You can call your existing API endpoints here
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate API call
   };
 
   const handleLogout = async () => {
@@ -175,23 +198,47 @@ export default function Dashboard() {
           )}
 
           {/* Main Tabs */}
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6 flex-1 flex flex-col overflow-hidden">
-            <TabsList className="grid w-full grid-cols-2 lg:w-[400px]">
-              <TabsTrigger value="appointments" className="flex items-center gap-2">
-                <IconReport className="h-4 w-4" />
-                Appointment Management
-              </TabsTrigger>
-              <TabsTrigger value="locks" className="flex items-center gap-2">
-                <IconLock className="h-4 w-4" />
-                Lock Management
-              </TabsTrigger>
-            </TabsList>
+          <Tabs value={activeTab} onValueChange={(value) => {
+            console.log('Tab changing from', activeTab, 'to', value);
+            setActiveTab(value);
+          }} className="space-y-6 flex-1 flex flex-col overflow-hidden">
+            <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
+              <TabsList className="grid w-full grid-cols-3 lg:w-[600px]">
+                <TabsTrigger value="appointments" className="flex items-center gap-2">
+                  <IconReport className="h-4 w-4" />
+                  Appointments
+                </TabsTrigger>
+                <TabsTrigger value="locks" className="flex items-center gap-2">
+                  <IconLock className="h-4 w-4" />
+                  Locks
+                </TabsTrigger>
+                <TabsTrigger value="realtime" className="flex items-center gap-2">
+                  <Edit3 className="h-4 w-4" />
+                  Real-time Editor
+                </TabsTrigger>
+              </TabsList>
+              
+              {/* Real-time connection status */}
+              <div className="flex items-center space-x-2">
+                {isConnected ? (
+                  <Badge variant="default" className="flex items-center space-x-1">
+                    <Wifi className="h-3 w-3" />
+                    <span>Connected</span>
+                  </Badge>
+                ) : (
+                  <Badge variant="destructive" className="flex items-center space-x-1">
+                    <WifiOff className="h-3 w-3" />
+                    <span>Disconnected</span>
+                  </Badge>
+                )}
+              </div>
+            </div>
 
             {/* Appointment CRUD Tab */}
             <TabsContent value="appointments" className="space-y-6 flex-1 overflow-y-auto">
               <AppointmentCRUD
                 userId={user?.id || ""}
-                onAppointmentSelect={handleAppointmentSelect}
+                onAppointmentSelect={handleRealtimeEdit}
                 selectedAppointmentId={selectedAppointment?.id}
               />
             </TabsContent>
@@ -211,6 +258,70 @@ export default function Dashboard() {
                   isAdmin={isAdmin}
                 />
               </LockProvider>
+            </TabsContent>
+
+            {/* Real-time Editor Tab */}
+            <TabsContent value="realtime" className="space-y-6 flex-1 overflow-y-auto">
+              {selectedAppointment ? (
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="flex items-center gap-2">
+                          <Edit3 className="h-5 w-5" />
+                          Real-time Appointment Editor
+                        </CardTitle>
+                        <CardDescription>
+                          Collaborate with other users in real-time to edit this appointment
+                        </CardDescription>
+                      </div>
+                      <Button 
+                        variant="outline" 
+                        onClick={handleExitRealtimeEdit}
+                        className="flex items-center gap-2"
+                      >
+                        <ArrowLeft className="h-4 w-4" />
+                        Back to List
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <RealtimeAppointmentEditor
+                      appointmentId={selectedAppointment.id}
+                      userId={user?.id || ""}
+                      userName={user?.name || ""}
+                      userEmail={user?.email || ""}
+                      initialData={{
+                        id: selectedAppointment.id,
+                        title: selectedAppointment.title,
+                        description: selectedAppointment.description,
+                        date: new Date(selectedAppointment.startDate).toISOString().split('T')[0],
+                        time: new Date(selectedAppointment.startDate).toTimeString().slice(0, 5),
+                        location: selectedAppointment.location || '',
+                      }}
+                      onSave={handleRealtimeSave}
+                      onCancel={handleExitRealtimeEdit}
+                    />
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card>
+                  <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                    <Edit3 className="h-12 w-12 text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">No Appointment Selected</h3>
+                    <p className="text-muted-foreground mb-4">
+                      Select an appointment from the Appointments tab to start real-time editing
+                    </p>
+                    <Button 
+                      onClick={() => setActiveTab("appointments")}
+                      className="flex items-center gap-2"
+                    >
+                      <IconReport className="h-4 w-4" />
+                      Go to Appointments
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
             </TabsContent>
           </Tabs>
 
