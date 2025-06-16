@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { io, Socket } from 'socket.io-client';
-import { AppointmentLock } from '../types/appointment';
+import { AppointmentLock, LockResponse } from '../types/appointment';
 
 interface LockContextType {
   isLocked: boolean;
@@ -8,11 +8,14 @@ interface LockContextType {
   currentLock: AppointmentLock | null;
   lockLoading: boolean;
   lockError: string | null;
-  acquireLock: (appointmentId: string, userId: string, userInfo: { name: string; email: string }) => Promise<boolean>;
-  releaseLock: (appointmentId: string, userId: string) => Promise<boolean>;
-  forceReleaseLock: (appointmentId: string, adminId: string) => Promise<boolean>;
-  updateUserPosition: (appointmentId: string, userId: string, position: { x: number; y: number }) => Promise<void>;
+  acquireLock: (appointmentId: string, userId: string, userInfo: { name: string; email: string }, expectedVersion?: number) => Promise<LockResponse>;
+  releaseLock: (appointmentId: string, userId: string, expectedVersion?: number) => Promise<LockResponse>;
+  forceReleaseLock: (appointmentId: string, adminId: string) => Promise<LockResponse>;
+  updateUserPosition: (appointmentId: string, userId: string, position: { x: number; y: number }, expectedVersion?: number) => Promise<LockResponse>;
   userCursors: Record<string, { position: { x: number; y: number }; userInfo: { name: string; email: string } }>;
+  currentVersion: number;
+  versionConflictCount: number;
+  resetVersionConflict: () => void;
 }
 
 const LockContext = createContext<LockContextType | undefined>(undefined);
@@ -29,12 +32,14 @@ interface LockProviderProps {
   children: ReactNode;
   appointmentId?: string;
   userId?: string;
+  disabled?: boolean;
 }
 
 export const LockProvider: React.FC<LockProviderProps> = ({ 
   children, 
   appointmentId,
-  userId 
+  userId,
+  disabled = false
 }) => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isLocked, setIsLocked] = useState(false);
@@ -43,12 +48,18 @@ export const LockProvider: React.FC<LockProviderProps> = ({
   const [lockLoading, setLockLoading] = useState(false);
   const [lockError, setLockError] = useState<string | null>(null);
   const [userCursors, setUserCursors] = useState<Record<string, { position: { x: number; y: number }; userInfo: { name: string; email: string } }>>({});
+  const [currentVersion, setCurrentVersion] = useState<number>(0);
+  const [versionConflictCount, setVersionConflictCount] = useState<number>(0);
+
+  const resetVersionConflict = () => {
+    setVersionConflictCount(0);
+  };
 
   // Initialize WebSocket connection
   useEffect(() => {
-    if (!appointmentId) return;
+    if (!appointmentId || disabled) return;
 
-    const newSocket = io(process.env.BACKEND_API_URL);
+    const newSocket = io(process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:8088');
     setSocket(newSocket);
 
     newSocket.on('connect', () => {
@@ -61,9 +72,15 @@ export const LockProvider: React.FC<LockProviderProps> = ({
       if (data.appointmentId === appointmentId) {
         setCurrentLock(data.lock);
         setIsLocked(!!data.lock);
-        if (data.lock && userId) {
-          setIsCurrentUserLockOwner(data.lock.userId === userId);
+        if (data.lock) {
+          setCurrentVersion(data.lock.version);
+          if (userId) {
+            setIsCurrentUserLockOwner(data.lock.userId === userId);
+          } else {
+            setIsCurrentUserLockOwner(false);
+          }
         } else {
+          setCurrentVersion(0);
           setIsCurrentUserLockOwner(false);
         }
       }
@@ -74,6 +91,7 @@ export const LockProvider: React.FC<LockProviderProps> = ({
       if (data.appointmentId === appointmentId) {
         setCurrentLock(data.lock);
         setIsLocked(true);
+        setCurrentVersion(data.lock.version);
         if (userId) {
           setIsCurrentUserLockOwner(data.lock.userId === userId);
         }
@@ -81,11 +99,21 @@ export const LockProvider: React.FC<LockProviderProps> = ({
     });
 
     // Listen for lock release
-    newSocket.on('lock-released', (data: { appointmentId: string }) => {
+    newSocket.on('lock-released', (data: { appointmentId: string; reason?: string; byAdmin?: boolean }) => {
       if (data.appointmentId === appointmentId) {
+        console.log('🔓 Lock released:', data.reason || 'User released');
         setCurrentLock(null);
         setIsLocked(false);
         setIsCurrentUserLockOwner(false);
+        setCurrentVersion(0);
+        resetVersionConflict();
+
+        // Show notification based on the reason for lock release
+        if (data.reason === 'expired') {
+          console.warn('⏰ Your lock has expired due to inactivity');
+        } else if (data.byAdmin) {
+          console.warn('👮 Your lock was released by an administrator');
+        }
       }
     });
 
@@ -96,11 +124,27 @@ export const LockProvider: React.FC<LockProviderProps> = ({
       adminInfo: { name: string; email: string } 
     }) => {
       if (data.appointmentId === appointmentId) {
+        console.log('👮 Admin takeover by:', data.adminInfo.name);
         setCurrentLock(null);
         setIsLocked(false);
         setIsCurrentUserLockOwner(false);
+        setCurrentVersion(0);
+        resetVersionConflict();
+        
         // Show notification about admin takeover
-        console.log(`Admin ${data.adminInfo.name} has taken control of this appointment`);
+        console.warn(`Admin ${data.adminInfo.name} has taken control of this appointment`);
+      }
+    });
+
+    // Listen for automatic cleanup notifications
+    newSocket.on('lock-expired', (data: { appointmentId: string; expiredLock: AppointmentLock }) => {
+      if (data.appointmentId === appointmentId && data.expiredLock.userId === userId) {
+        console.warn('⏰ Your lock has expired automatically due to inactivity');
+        setCurrentLock(null);
+        setIsLocked(false);
+        setIsCurrentUserLockOwner(false);
+        setCurrentVersion(0);
+        resetVersionConflict();
       }
     });
 
@@ -131,22 +175,57 @@ export const LockProvider: React.FC<LockProviderProps> = ({
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appointmentId, userId]);
+  }, [appointmentId, userId, disabled]);
 
   // Auto-refresh lock every 4 minutes to prevent expiration (which happens at 5 minutes)
+  // This also ensures version incrementation happens regularly
   useEffect(() => {
     if (!isCurrentUserLockOwner || !appointmentId || !userId || !currentLock) return;
 
-    const interval = setInterval(() => {
-      // Re-acquire the lock to refresh it
-      acquireLock(appointmentId, userId, {
-        name: currentLock.userInfo.name,
-        email: currentLock.userInfo.email
-      });
-    }, 4 * 60 * 1000); // 4 minutes
+    const refreshLock = async () => {
+      console.log('🔄 Auto-refreshing lock to prevent expiration...');
+      
+      try {
+        const response = await fetch(`/api/appointments/${appointmentId}/acquire-lock`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            userId, 
+            userInfo: {
+              name: currentLock.userInfo.name,
+              email: currentLock.userInfo.email
+            },
+            expectedVersion: currentVersion
+          }),
+        });
+        
+        const refreshResult: LockResponse = await response.json();
+
+        if (refreshResult.success && refreshResult.lock) {
+          console.log('✅ Lock auto-refresh successful, version:', refreshResult.lock.version);
+          setCurrentLock(refreshResult.lock);
+          setCurrentVersion(refreshResult.lock.version);
+          resetVersionConflict();
+        } else {
+          console.warn('⚠️ Lock auto-refresh failed:', refreshResult.message);
+          
+          // If auto-refresh fails, it might mean someone else has the lock now
+          if (refreshResult.conflictDetails) {
+            setVersionConflictCount(prev => prev + 1);
+            setCurrentVersion(refreshResult.conflictDetails.currentVersion);
+          }
+        }
+      } catch (error) {
+        console.error('❌ Lock auto-refresh error:', error);
+      }
+    };
+
+    const interval = setInterval(refreshLock, 4 * 60 * 1000); // 4 minutes
 
     return () => clearInterval(interval);
-  }, [isCurrentUserLockOwner, appointmentId, userId, currentLock]);
+  }, [isCurrentUserLockOwner, appointmentId, userId, currentLock, currentVersion]);
 
   // Release lock on component unmount or tab close
   useEffect(() => {
@@ -154,8 +233,8 @@ export const LockProvider: React.FC<LockProviderProps> = ({
       if (isCurrentUserLockOwner && appointmentId && userId) {
         // Synchronous API call to release lock before page unload
         navigator.sendBeacon(
-          `${process.env.BACKEND_API_URL}/appointments/${appointmentId}/release-lock`,
-          JSON.stringify({ userId })
+          `${process.env.BACKEND_API_URL || 'http://localhost:8088/api/v1'}/appointments/${appointmentId}/release-lock`,
+          JSON.stringify({ userId, expectedVersion: currentVersion })
         );
       }
     };
@@ -165,22 +244,23 @@ export const LockProvider: React.FC<LockProviderProps> = ({
       window.removeEventListener('beforeunload', handleBeforeUnload);
       // Also try to release lock on component unmount
       if (isCurrentUserLockOwner && appointmentId && userId) {
-        releaseLock(appointmentId, userId).catch(console.error);
+        releaseLock(appointmentId, userId, currentVersion).catch(console.error);
       }
     };
-  }, [isCurrentUserLockOwner, appointmentId, userId]);
+  }, [isCurrentUserLockOwner, appointmentId, userId, currentVersion]);
 
   const fetchLockStatus = async (appointmentId: string) => {
     try {
       setLockLoading(true);
       setLockError(null);
       
-      const response = await fetch(`${process.env.BACKEND_API_URL}/appointments/${appointmentId}/lock-status`);
+      const response = await fetch(`/api/appointments/${appointmentId}/lock-status`);
       const data = await response.json();
       
       if (data.lock) {
         setCurrentLock(data.lock);
         setIsLocked(true);
+        setCurrentVersion(data.lock.version);
         if (userId) {
           setIsCurrentUserLockOwner(data.lock.userId === userId);
         }
@@ -188,6 +268,7 @@ export const LockProvider: React.FC<LockProviderProps> = ({
         setCurrentLock(null);
         setIsLocked(false);
         setIsCurrentUserLockOwner(false);
+        setCurrentVersion(0);
       }
       
       return data;
@@ -203,79 +284,122 @@ export const LockProvider: React.FC<LockProviderProps> = ({
   const acquireLock = async (
     appointmentId: string, 
     userId: string, 
-    userInfo: { name: string; email: string }
-  ): Promise<boolean> => {
+    userInfo: { name: string; email: string },
+    expectedVersion?: number
+  ): Promise<LockResponse> => {
+    if (disabled) return { success: false, message: 'Lock operations are disabled' };
+    
     try {
       setLockLoading(true);
       setLockError(null);
       
-      const response = await fetch(`${process.env.BACKEND_API_URL}/appointments/${appointmentId}/acquire-lock`, {
+      const response = await fetch(`/api/appointments/${appointmentId}/acquire-lock`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ userId, userInfo }),
+        body: JSON.stringify({ 
+          userId, 
+          userInfo,
+          expectedVersion: expectedVersion ?? currentVersion
+        }),
       });
       
-      const data = await response.json();
+      const data: LockResponse = await response.json();
       
-      if (data.success) {
+      if (data.success && data.lock) {
         setCurrentLock(data.lock);
         setIsLocked(true);
         setIsCurrentUserLockOwner(true);
-        return true;
+        setCurrentVersion(data.lock.version);
+        resetVersionConflict();
       } else {
         setLockError(data.message);
-        return false;
+        
+        // Handle version conflicts
+        if (data.conflictDetails) {
+          setVersionConflictCount(prev => prev + 1);
+          setCurrentVersion(data.conflictDetails.currentVersion);
+          
+          // If there's a current lock from the response, update it
+          if (data.lock) {
+            setCurrentLock(data.lock);
+            setIsLocked(true);
+            setIsCurrentUserLockOwner(data.lock.userId === userId);
+          }
+        }
       }
+      
+      return data;
     } catch (error) {
       console.error('Error acquiring lock:', error);
-      setLockError('Failed to acquire lock');
-      return false;
+      const errorResponse: LockResponse = { success: false, message: 'Failed to acquire lock' };
+      setLockError(errorResponse.message);
+      return errorResponse;
     } finally {
       setLockLoading(false);
     }
   };
 
-  const releaseLock = async (appointmentId: string, userId: string): Promise<boolean> => {
+  const releaseLock = async (
+    appointmentId: string, 
+    userId: string, 
+    expectedVersion?: number
+  ): Promise<LockResponse> => {
+    if (disabled) return { success: false, message: 'Lock operations are disabled' };
+    
     try {
       setLockLoading(true);
       setLockError(null);
       
-      const response = await fetch(`${process.env.BACKEND_API_URL}/appointments/${appointmentId}/release-lock`, {
+      const response = await fetch(`/api/appointments/${appointmentId}/release-lock`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ userId }),
+        body: JSON.stringify({ 
+          userId,
+          expectedVersion: expectedVersion ?? currentVersion
+        }),
       });
       
-      const data = await response.json();
+      const data: LockResponse = await response.json();
       
       if (data.success) {
         setCurrentLock(null);
         setIsLocked(false);
         setIsCurrentUserLockOwner(false);
-        return true;
+        setCurrentVersion(0);
+        resetVersionConflict();
       } else {
         setLockError(data.message);
-        return false;
+        
+        // Handle version conflicts
+        if (data.conflictDetails) {
+          setVersionConflictCount(prev => prev + 1);
+          setCurrentVersion(data.conflictDetails.currentVersion);
+        }
       }
+      
+      return data;
     } catch (error) {
       console.error('Error releasing lock:', error);
-      setLockError('Failed to release lock');
-      return false;
+      const errorResponse: LockResponse = { success: false, message: 'Failed to release lock' };
+      setLockError(errorResponse.message);
+      return errorResponse;
     } finally {
       setLockLoading(false);
     }
   };
 
-  const forceReleaseLock = async (appointmentId: string, adminId: string): Promise<boolean> => {
+  const forceReleaseLock = async (appointmentId: string, adminId: string): Promise<LockResponse> => {
+    if (disabled) return { success: false, message: 'Lock operations are disabled' };
+    
     try {
       setLockLoading(true);
       setLockError(null);
       
-      const response = await fetch(`${process.env.BACKEND_API_URL}/appointments/${appointmentId}/force-release-lock`, {
+      const response = await fetch(`/api/appointments/${appointmentId}/force-release-lock`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
@@ -283,21 +407,24 @@ export const LockProvider: React.FC<LockProviderProps> = ({
         body: JSON.stringify({ adminId }),
       });
       
-      const data = await response.json();
+      const data: LockResponse = await response.json();
       
       if (data.success) {
         setCurrentLock(null);
         setIsLocked(false);
         setIsCurrentUserLockOwner(false);
-        return true;
+        setCurrentVersion(0);
+        resetVersionConflict();
       } else {
         setLockError(data.message);
-        return false;
       }
+      
+      return data;
     } catch (error) {
       console.error('Error force releasing lock:', error);
-      setLockError('Failed to force release lock');
-      return false;
+      const errorResponse: LockResponse = { success: false, message: 'Failed to force release lock' };
+      setLockError(errorResponse.message);
+      return errorResponse;
     } finally {
       setLockLoading(false);
     }
@@ -306,8 +433,11 @@ export const LockProvider: React.FC<LockProviderProps> = ({
   const updateUserPosition = async (
     appointmentId: string, 
     userId: string, 
-    position: { x: number; y: number }
-  ): Promise<void> => {
+    position: { x: number; y: number },
+    expectedVersion?: number
+  ): Promise<LockResponse> => {
+    if (disabled) return { success: false, message: 'Lock operations are disabled' };
+    
     try {
       // Update position via WebSocket for real-time updates
       if (socket) {
@@ -318,16 +448,35 @@ export const LockProvider: React.FC<LockProviderProps> = ({
         });
       }
       
-      // Also update via REST API to refresh lock timeout
-      await fetch(`${process.env.BACKEND_API_URL}/appointments/${appointmentId}/update-position`, {
+      // Also update via REST API to refresh lock timeout with optimistic locking
+      const response = await fetch(`/api/appointments/${appointmentId}/update-position`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ userId, position }),
+        body: JSON.stringify({ 
+          userId, 
+          position,
+          expectedVersion: expectedVersion ?? currentVersion
+        }),
       });
+      
+      const data: LockResponse = await response.json();
+      
+      if (data.success && data.lock) {
+        // Update the current version if position update succeeded
+        setCurrentVersion(data.lock.version);
+        setCurrentLock(data.lock);
+      } else if (data.conflictDetails) {
+        // Handle version conflicts
+        setVersionConflictCount(prev => prev + 1);
+        setCurrentVersion(data.conflictDetails.currentVersion);
+      }
+      
+      return data;
     } catch (error) {
       console.error('Error updating position:', error);
+      return { success: false, message: 'Failed to update position' };
     }
   };
 
@@ -343,7 +492,10 @@ export const LockProvider: React.FC<LockProviderProps> = ({
         releaseLock,
         forceReleaseLock,
         updateUserPosition,
-        userCursors
+        userCursors,
+        currentVersion,
+        versionConflictCount,
+        resetVersionConflict
       }}
     >
       {children}

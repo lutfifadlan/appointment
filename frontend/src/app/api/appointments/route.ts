@@ -34,6 +34,8 @@ export async function POST(request: Request) {
       body: JSON.stringify(body),
     });
 
+    console.log(response);
+
     if (!response.ok) {
       throw new Error('Failed to create appointment');
     }

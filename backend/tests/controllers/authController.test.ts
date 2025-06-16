@@ -11,6 +11,7 @@ interface UserResponse {
   id: string;
   email: string;
   name: string;
+  role: string;
   created_at: Date;
   updated_at: Date;
   token: string;
@@ -50,6 +51,7 @@ describe('AuthController', () => {
         id: '123',
         email: 'test@example.com',
         name: 'Test User',
+        role: 'user',
         created_at: new Date(),
         updated_at: new Date(),
         token: 'jwt-token'
@@ -58,6 +60,7 @@ describe('AuthController', () => {
         email: 'test@example.com',
         name: 'Test User',
         password: 'password123',
+        role: 'user',
       };
 
       mockAuthService.signup.mockResolvedValue(mockUser);
@@ -93,6 +96,7 @@ describe('AuthController', () => {
         id: '123',
         email: 'test@example.com',
         name: 'Test User',
+        role: 'user',
         created_at: new Date(),
         updated_at: new Date(),
         token: 'jwt-token'
@@ -133,6 +137,7 @@ describe('AuthController', () => {
       const mockUser = {
         id: '123',
         email: 'test@example.com',
+        role: 'user',
         name: 'Test User',
         created_at: new Date(),
         updated_at: new Date()
@@ -171,9 +176,7 @@ describe('AuthController', () => {
         hash_password: 'hashed-password',
         created_at: new Date(),
         updated_at: new Date(),
-        validatePassword: async (password: string): Promise<boolean> => true,
-        save: async (): Promise<UserEntity> => mockUser,
-        hashPassword: async (): Promise<void> => {}
+        role: 'user'
       };
       mockRequest.headers = {
         authorization: 'Bearer valid-token',

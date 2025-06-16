@@ -66,9 +66,26 @@ export class WebSocketService {
       socket.on('cursor-position', (data: { 
         appointmentId: string;
         userId: string;
+        userInfo?: { name: string; email: string };
         position: CursorPosition;
       }) => {
         this.handleCursorPosition(socket, data);
+      });
+
+      socket.on('forceTakeover', (data: { 
+        appointmentId: string;
+        userId: string;
+        userInfo: { name: string; email: string };
+      }, callback) => {
+        this.handleForceTakeover(data, callback);
+      });
+
+      socket.on('requestTakeover', (data: { 
+        appointmentId: string;
+        userId: string;
+        userInfo: { name: string; email: string };
+      }, callback) => {
+        this.handleRequestTakeover(data, callback);
       });
 
       socket.on('disconnect', () => {
@@ -129,6 +146,7 @@ export class WebSocketService {
   private handleCursorPosition(socket: any, data: { 
     appointmentId: string;
     userId: string;
+    userInfo?: { name: string; email: string };
     position: CursorPosition;
   }): void {
     if (!data?.appointmentId || !data?.userId || !data?.position) {
@@ -136,9 +154,10 @@ export class WebSocketService {
     }
 
     try {
-      const { appointmentId, userId, position } = data;
+      const { appointmentId, userId, userInfo, position } = data;
       socket.to(`appointment:${appointmentId}`).emit('cursor-update', {
         userId,
+        userInfo: userInfo || { name: 'Unknown User', email: '' },
         position
       });
     } catch (error) {
@@ -162,6 +181,76 @@ export class WebSocketService {
       });
     } catch (error) {
       console.error('Failed to handle disconnection:', error);
+    }
+  }
+
+  /**
+   * Handle admin force takeover
+   * @private
+   */
+  private async handleForceTakeover(data: { 
+    appointmentId: string;
+    userId: string;
+    userInfo: { name: string; email: string };
+  }, callback: (response: { success: boolean; error?: string }) => void): Promise<void> {
+    try {
+      console.log('🔧 Force takeover received:', JSON.stringify(data, null, 2));
+      const { appointmentId, userId, userInfo } = data;
+      
+      if (!appointmentId || !userId || !userInfo || !userInfo.name || !userInfo.email) {
+        console.log('❌ Missing parameters:', { appointmentId, userId, userInfo });
+        callback({ success: false, error: 'Missing required parameters' });
+        return;
+      }
+
+      // Import LockService dynamically to avoid circular dependencies
+      const { LockService } = await import('./lockService.js');
+      const lockService = new LockService();
+      
+      // Perform admin takeover
+      const result = await lockService.adminTakeover(appointmentId, userId, userInfo);
+      
+      if (result.success) {
+        callback({ success: true });
+      } else {
+        callback({ success: false, error: result.message });
+      }
+    } catch (error) {
+      console.error('Failed to handle force takeover:', error);
+      callback({ success: false, error: 'Internal server error' });
+    }
+  }
+
+  /**
+   * Handle regular user takeover request
+   * @private
+   */
+  private async handleRequestTakeover(data: { 
+    appointmentId: string;
+    userId: string;
+    userInfo: { name: string; email: string };
+  }, callback: (response: { success: boolean; error?: string }) => void): Promise<void> {
+    try {
+      const { appointmentId, userId, userInfo } = data;
+      
+      if (!appointmentId || !userId || !userInfo) {
+        callback({ success: false, error: 'Missing required parameters' });
+        return;
+      }
+
+      // For now, non-admin users can't directly takeover
+      // This would typically send a notification to admins
+      console.log(`User ${userInfo.name} requested takeover for appointment ${appointmentId}`);
+      
+      // In a real implementation, you would:
+      // 1. Store the takeover request
+      // 2. Notify all admin users
+      // 3. Allow admins to approve/deny the request
+      
+      callback({ success: true });
+    } catch (error) {
+      console.error('Failed to handle request takeover:', error);
+      callback({ success: false, error: 'Internal server error' });
     }
   }
 

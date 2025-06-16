@@ -18,7 +18,7 @@ export const getLockStatus = async (req: Request, res: Response): Promise<Respon
 export const acquireLock = async (req: Request, res: Response): Promise<Response | void> => {
   try {
     const { id } = req.params;
-    const { userId, userInfo } = req.body;
+    const { userId, userInfo, expectedVersion } = req.body;
 
     if (!userId || !userInfo || !userInfo.name || !userInfo.email) {
       return res.status(400).json({
@@ -27,7 +27,7 @@ export const acquireLock = async (req: Request, res: Response): Promise<Response
       });
     }
 
-    const response = await lockService.acquireLock(id, userId, userInfo);
+    const response = await lockService.acquireLock(id, userId, userInfo, expectedVersion);
     
     if (!response.success) {
       return res.status(409).json(response); // 409 Conflict
@@ -46,7 +46,7 @@ export const acquireLock = async (req: Request, res: Response): Promise<Response
 export const releaseLock = async (req: Request, res: Response): Promise<Response | void> => {
   try {
     const { id } = req.params;
-    const { userId } = req.body;
+    const { userId, expectedVersion } = req.body;
 
     if (!userId) {
       return res.status(400).json({
@@ -55,9 +55,13 @@ export const releaseLock = async (req: Request, res: Response): Promise<Response
       });
     }
 
-    const response = await lockService.releaseLock(id, userId);
+    const response = await lockService.releaseLock(id, userId, expectedVersion);
     
     if (!response.success) {
+      // Return 409 Conflict for version mismatch
+      if (response.conflictDetails) {
+        return res.status(409).json(response);
+      }
       return res.status(400).json(response);
     }
     
@@ -103,7 +107,7 @@ export const forceReleaseLock = async (req: Request, res: Response): Promise<Res
 export const updateUserPosition = async (req: Request, res: Response): Promise<Response | void> => {
   try {
     const { id } = req.params;
-    const { userId, position } = req.body;
+    const { userId, position, expectedVersion } = req.body;
 
     if (!userId || !position || position.x === undefined || position.y === undefined) {
       return res.status(400).json({
@@ -112,9 +116,13 @@ export const updateUserPosition = async (req: Request, res: Response): Promise<R
       });
     }
 
-    const response = await lockService.updateUserPosition(id, userId, position);
+    const response = await lockService.updateUserPosition(id, userId, position, expectedVersion);
     
     if (!response.success) {
+      // Return 409 Conflict for version mismatch
+      if (response.conflictDetails) {
+        return res.status(409).json(response);
+      }
       return res.status(400).json(response);
     }
     
@@ -127,3 +135,40 @@ export const updateUserPosition = async (req: Request, res: Response): Promise<R
     });
   }
 };
+
+export const manualCleanup = async (req: Request, res: Response): Promise<Response | void> => {
+  try {
+    const response = await lockService.manualCleanup();
+    
+    if (!response.success) {
+      return res.status(500).json(response);
+    }
+    
+    res.status(200).json(response);
+  } catch (error) {
+    console.error('Error during manual cleanup:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      cleanedCount: 0
+    });
+  }
+};
+
+export const getHealthStatus = async (req: Request, res: Response): Promise<Response | void> => {
+  try {
+    const healthStatus = lockService.getHealthStatus();
+    
+    res.status(200).json({
+      success: true,
+      data: healthStatus
+    });
+  } catch (error) {
+    console.error('Error getting health status:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+    });
+  }
+};
+

@@ -2,51 +2,84 @@
 import React, { useState, useEffect } from "react";
 import { Sidebar, SidebarBody, SidebarLink } from "@/components/ui/sidebar";
 import {
-  IconArrowLeft,
-  IconSettings,
   IconReport,
   IconLock,
-  IconLockOpen,
-  IconUser,
 } from "@tabler/icons-react";
-import { motion } from "motion/react";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
-import { useAppointmentLock } from "@/hooks/useAppointmentLock";
 import { useAuth } from "@/hooks/useAuth";
-import { useSocket } from "@/hooks/useSocket";
 import { useRouter } from "next/navigation";
+import { Appointment } from "@/components/Appointment";
+import { LockManagement } from "@/components/LockManagement";
+import { LockProvider } from "@/lib/contexts/LockContext";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { RealtimeAppointmentEditor } from "@/components/RealtimeAppointmentEditor";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { useSocket } from "@/hooks/useSocket";
+import { Wifi, WifiOff, Edit3, ArrowLeft, Sun, Moon, LogOutIcon } from "lucide-react";
+import { useTheme } from "next-themes";
+import { toast } from "sonner";
 
 interface Appointment {
   id: string;
   title: string;
-  description?: string;
+  description: string;
   startDate: string;
   endDate: string;
-  status: "scheduled" | "completed" | "cancelled";
-  location?: string;
-  organizer?: string;
-  attendees?: string[];
-  version: number;
+  location: string | null;
+  organizer: string | null;
+  attendees: string[] | null;
+  status: 'scheduled' | 'completed' | 'cancelled';
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface AppointmentData {
+  id?: string;
+  title: string;
+  description: string;
+  date: string;
+  time: string;
+  location: string;
 }
 
 export default function Dashboard() {
   const router = useRouter();
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [activeTab, setActiveTab] = useState("appointments");
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const { user, isAdmin } = useAuth();
-  const { socket } = useSocket();
+  
+  // Debug logging
+  useEffect(() => {
+    console.log('Dashboard - User:', user);
+    console.log('Dashboard - isAdmin:', isAdmin);
+  }, [user, isAdmin]);
+  const { isConnected } = useSocket();
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
 
-  const {
-    lock,
-    isLoading: isLockLoading,
-    error: lockError,
-    acquireLock,
-    releaseLock,
-    forceReleaseLock,
-    hasLock,
-    isLocked,
-  } = useAppointmentLock(selectedAppointment?.id || "");
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Generate user color for collaborative features
+  const userColor = React.useMemo(() => {
+    if (!user?.id) return '#0ea5e9';
+    const colors = [
+      '#0ea5e9', '#737373', '#14b8a6', '#22c55e',
+      '#3b82f6', '#ef4444', '#eab308', '#f97316',
+      '#ec4899', '#8b5cf6', '#06b6d4', '#84cc16'
+    ];
+    let hash = 0;
+    for (let i = 0; i < user.id.length; i++) {
+      hash = ((hash << 5) - hash + user.id.charCodeAt(i)) & 0xffffffff;
+    }
+    return colors[Math.abs(hash) % colors.length];
+  }, [user?.id]);
 
   useEffect(() => {
     const fetchSession = async () => {
@@ -58,62 +91,124 @@ export default function Dashboard() {
       }
     };
     fetchSession();
+  }, [router]);
 
-    const fetchAppointments = async () => {
-      try {
-        const response = await fetch("/api/appointments");
-        const data = await response.json();
-        
-        // Check if data is an array
-        if (!Array.isArray(data)) {
-          console.error("Received invalid data format:", data);
-          setAppointments([]);
-          return;
-        }
-        
-        setAppointments(data);
-      } catch (error) {
-        console.error("Failed to fetch appointments:", error);
-        setAppointments([]);
-      }
-    };
-
-    fetchAppointments();
-  }, []);
-
-  useEffect(() => {
-    if (!socket || !selectedAppointment) return;
-
-    socket.on("appointment-update", (updatedAppointment: Appointment) => {
-      setAppointments((prev) =>
-        prev.map((apt) =>
-          apt.id === updatedAppointment.id ? updatedAppointment : apt
-        )
-      );
-    });
-
-    return () => {
-      socket.off("appointment-update");
-    };
-  }, [socket, selectedAppointment]);
-
-  const handleAppointmentSelect = async (appointment: Appointment) => {
+  const handleRealtimeEdit = (appointment: Appointment) => {
+    console.log('handleRealtimeEdit called with:', appointment.title);
+    console.log('Current activeTab before change:', activeTab);
     setSelectedAppointment(appointment);
+    setActiveTab("realtime");
+    console.log('Set activeTab to: realtime');
   };
 
-  const handleLockToggle = async () => {
-    if (!selectedAppointment) return;
+  const handleLockAppointment = (appointment: Appointment) => {
+    console.log('handleLockAppointment called with:', appointment.title);
+    console.log('Current activeTab before change:', activeTab);
+    setSelectedAppointment(appointment);
+    setActiveTab("locks");
+    console.log('Set activeTab to: locks');
+  };
 
-    if (hasLock()) {
-      await releaseLock();
-    } else {
-      await acquireLock();
+  const handleExitRealtimeEdit = () => {
+    setActiveTab("appointments");
+  };
+
+  const handleRealtimeSave = async (data: AppointmentData) => {
+    if (!selectedAppointment) {
+      toast.error('No appointment selected');
+      return;
+    }
+
+    try {
+      // Convert form data to backend format
+      const startDateTime = new Date(`${data.date}T${data.time}`);
+      const endDateTime = new Date(startDateTime.getTime() + 60 * 60 * 1000); // Default 1 hour duration
+
+      const appointmentData = {
+        title: data.title,
+        description: data.description,
+        startDate: startDateTime.toISOString(),
+        endDate: endDateTime.toISOString(),
+        location: data.location || null,
+        status: selectedAppointment.status, // Keep existing status
+        organizer: selectedAppointment.organizer,
+        attendees: selectedAppointment.attendees,
+      };
+
+      console.log('Saving appointment data:', appointmentData);
+
+      // Update the appointment via API
+      const response = await fetch(`/api/appointments/${selectedAppointment.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(appointmentData),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to update appointment');
+      }
+
+      const updatedAppointment = await response.json();
+      console.log('Appointment updated successfully:', updatedAppointment);
+
+      // Release the lock automatically
+      try {
+        const lockResponse = await fetch(`/api/appointments/${selectedAppointment.id}/release-lock`, {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: user?.id }),
+        });
+
+        if (lockResponse.ok) {
+          console.log('Lock released successfully');
+          toast.success('Changes saved and lock released');
+        } else {
+          console.warn('Failed to release lock, but appointment was saved');
+          toast.success('Changes saved (but lock release failed)');
+        }
+      } catch (lockError) {
+        console.error('Error releasing lock:', lockError);
+        toast.success('Changes saved (but lock release failed)');
+      }
+
+      // Redirect to appointments tab automatically
+      setActiveTab("appointments");
+      
+      // Clear selected appointment and trigger refresh
+      setSelectedAppointment(null);
+      setRefreshTrigger(prev => prev + 1);
+
+    } catch (error) {
+      console.error('Save error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save appointment';
+      toast.error(errorMessage);
+      throw error; // Re-throw to let the RealtimeAppointmentEditor handle it
     }
   };
 
-  const handleForceRelease = async () => {
-    if (!selectedAppointment || !isAdmin) return;
-    await forceReleaseLock();
+  const handleLogout = async () => {
+    try {
+      const response = await fetch('/api/auth/logout', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to logout');
+      }
+
+      router.replace('/auth/signin');
+    } catch (error) {
+      console.error('Logout error:', error);
+      router.replace('/auth/signin');
+    }
+  };
+
+  const handleThemeToggle = () => {
+    setTheme(theme === "dark" ? "light" : "dark");
   };
 
   const links = [
@@ -125,18 +220,26 @@ export default function Dashboard() {
       ),
     },
     {
-      label: "Settings",
+      label: mounted ? (theme === "dark" ? "Light" : "Dark") : "Theme",
       href: "#",
-      icon: (
-        <IconSettings className="h-5 w-5 shrink-0 text-neutral-700 dark:text-neutral-200" />
+      icon: mounted ? (
+        theme === "dark" ? (
+          <Sun className="h-5 w-5 shrink-0 text-neutral-700 dark:text-neutral-200" />
+        ) : (
+          <Moon className="h-5 w-5 shrink-0 text-neutral-700 dark:text-neutral-200" />
+        )
+      ) : (
+        <Sun className="h-5 w-5 shrink-0 text-neutral-700 dark:text-neutral-200" />
       ),
+      onClick: handleThemeToggle,
     },
     {
       label: "Logout",
       href: "#",
       icon: (
-        <IconArrowLeft className="h-5 w-5 shrink-0 text-neutral-700 dark:text-neutral-200" />
+        <LogOutIcon className="h-5 w-5 shrink-0 text-neutral-700 dark:text-neutral-200" />
       ),
+      onClick: handleLogout,
     },
   ];
 
@@ -145,12 +248,12 @@ export default function Dashboard() {
   return (
     <div
       className={cn(
-        "mx-auto flex w-full flex-1 flex-col overflow-hidden rounded-md border border-neutral-200 bg-gray-100 md:flex-row dark:border-neutral-700 dark:bg-neutral-800",
+        "mx-auto flex w-full flex-1 flex-col overflow-hidden rounded-md border border-neutral-200 bg-gray-100 md:flex-row dark:border-neutral-700 dark:bg-neutral-800 relative",
         "h-screen"
       )}
-    >
+    >      
       <Sidebar open={open} setOpen={setOpen}>
-        <SidebarBody className="justify-between gap-10">
+        <SidebarBody className="justify-between gap-10 bg-white dark:bg-neutral-900 relative z-10">
           <div className="flex flex-1 flex-col overflow-x-hidden overflow-y-auto">
             {open ? <Logo /> : <LogoIcon />}
             <div className="mt-8 flex flex-col gap-2">
@@ -162,16 +265,23 @@ export default function Dashboard() {
           <div>
             <SidebarLink
               link={{
-                label: user?.name || "User",
+                label: `${user?.name || "User"} • ${isAdmin ? "Admin" : "User"}`,
                 href: "#",
                 icon: (
-                  <Image
-                    src="/avatar-placeholder.png"
-                    className="h-7 w-7 shrink-0 rounded-full"
-                    width={50}
-                    height={50}
-                    alt="Avatar"
-                  />
+                  <div className="relative">
+                    <Image
+                      src="/avatar-placeholder.png"
+                      className="h-7 w-7 shrink-0 rounded-full"
+                      width={50}
+                      height={50}
+                      alt="Avatar"
+                    />
+                    {isAdmin && (
+                      <div className="absolute -top-1 -right-1 h-3 w-3 bg-yellow-500 rounded-full border border-white dark:border-neutral-900 flex items-center justify-center">
+                        <span className="text-[8px] text-white font-bold">A</span>
+                      </div>
+                    )}
+                  </div>
                 ),
               }}
             />
@@ -180,141 +290,165 @@ export default function Dashboard() {
       </Sidebar>
 
       <div className="flex flex-1">
-        <div className="flex h-full w-full flex-1 flex-col gap-2 rounded-tl-2xl border border-neutral-200 bg-white p-2 md:p-10 dark:border-neutral-700 dark:bg-neutral-900">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {appointments.map((appointment) => (
-              <div
-                key={appointment.id}
-                className={cn(
-                  "cursor-pointer rounded-lg border p-4 transition-all hover:shadow-md",
-                  selectedAppointment?.id === appointment.id
-                    ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
-                    : "border-neutral-200 dark:border-neutral-700"
-                )}
-                onClick={() => handleAppointmentSelect(appointment)}
-              >
-                <h3 className="font-semibold">{appointment.title}</h3>
-                <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                  {new Date(appointment.startDate).toLocaleString()}
-                </p>
-                <div className="mt-2 flex items-center gap-2">
-                  <span
-                    className={cn(
-                      "rounded-full px-2 py-1 text-xs",
-                      appointment.status === "scheduled"
-                        ? "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400"
-                        : appointment.status === "completed"
-                        ? "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400"
-                        : "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400"
-                    )}
-                  >
-                    {appointment.status}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-
+        <div className="flex h-full w-full flex-1 flex-col gap-2 rounded-tl-2xl border border-neutral-200 bg-white/95 backdrop-blur-sm p-2 md:p-10 dark:border-neutral-700 dark:bg-neutral-900/95 overflow-y-auto relative z-10">
+          
+          {/* Selected Appointment Banner */}
           {selectedAppointment && (
-            <div className="mt-8 rounded-lg border border-neutral-200 p-6 dark:border-neutral-700">
-              <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-2xl font-bold">{selectedAppointment.title}</h2>
-                <div className="flex items-center gap-4">
-                  {isLocked && (
-                    <div className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400">
-                      <IconUser className="h-4 w-4" />
-                      <span>
-                        Locked by: {lock?.userInfo.name} (
-                        {new Date(lock!.expiresAt).toLocaleTimeString()})
-                      </span>
-                    </div>
-                  )}
-                  <button
-                    onClick={handleLockToggle}
-                    disabled={isLockLoading}
-                    className={cn(
-                      "flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors",
-                      hasLock()
-                        ? "bg-red-100 text-red-800 hover:bg-red-200 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/30"
-                        : "bg-blue-100 text-blue-800 hover:bg-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/30"
-                    )}
-                  >
-                    {hasLock() ? (
-                      <>
-                        <IconLockOpen className="h-4 w-4" />
-                        Release Lock
-                      </>
-                    ) : (
-                      <>
-                        <IconLock className="h-4 w-4" />
-                        Acquire Lock
-                      </>
-                    )}
-                  </button>
-                  {isAdmin && isLocked && !hasLock() && (
-                    <button
-                      onClick={handleForceRelease}
-                      className="flex items-center gap-2 rounded-md bg-yellow-100 px-4 py-2 text-sm font-medium text-yellow-800 transition-colors hover:bg-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-400 dark:hover:bg-yellow-900/30"
-                    >
-                      Force Release
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {lockError && (
-                <div className="mb-4 rounded-md bg-red-100 p-4 text-sm text-red-800 dark:bg-red-900/20 dark:text-red-400">
-                  {lockError}
-                </div>
-              )}
-
-              <div className="grid gap-6 md:grid-cols-2">
+            <div className="mb-6 rounded-lg border-l-4 border-l-blue-500 bg-blue-50 p-4 dark:bg-blue-900/20">
+              <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="mb-2 font-semibold">Details</h3>
-                  <div className="space-y-2">
-                    <p>
-                      <span className="font-medium">Start:</span>{" "}
-                      {new Date(selectedAppointment.startDate).toLocaleString()}
-                    </p>
-                    <p>
-                      <span className="font-medium">End:</span>{" "}
-                      {new Date(selectedAppointment.endDate).toLocaleString()}
-                    </p>
-                    <p>
-                      <span className="font-medium">Location:</span>{" "}
-                      {selectedAppointment.location || "N/A"}
-                    </p>
-                    <p>
-                      <span className="font-medium">Organizer:</span>{" "}
-                      {selectedAppointment.organizer || "N/A"}
-                    </p>
-                  </div>
-                </div>
-                <div>
-                  <h3 className="mb-2 font-semibold">Description</h3>
-                  <p className="text-neutral-600 dark:text-neutral-400">
-                    {selectedAppointment.description || "No description provided"}
+                  <h3 className="font-semibold text-lg">{selectedAppointment.title}</h3>
+                  <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                    {new Date(selectedAppointment.startDate).toLocaleString()} • {selectedAppointment.location}
                   </p>
                 </div>
+                <span
+                  className={cn(
+                    "rounded-full px-3 py-1 text-sm font-medium",
+                    selectedAppointment.status === "scheduled"
+                      ? "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400"
+                      : selectedAppointment.status === "completed"
+                      ? "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400"
+                      : "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400"
+                  )}
+                >
+                  {selectedAppointment.status}
+                </span>
               </div>
-
-              {selectedAppointment.attendees && selectedAppointment.attendees.length > 0 && (
-                <div className="mt-6">
-                  <h3 className="mb-2 font-semibold">Attendees</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedAppointment.attendees.map((attendee, index) => (
-                      <span
-                        key={index}
-                        className="rounded-full bg-neutral-100 px-3 py-1 text-sm dark:bg-neutral-800"
-                      >
-                        {attendee}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           )}
+
+          {/* Main Tabs */}
+          <Tabs value={activeTab} onValueChange={(value) => {
+            console.log('Tab changing from', activeTab, 'to', value);
+            setActiveTab(value);
+          }} className="space-y-6 flex-1 flex flex-col overflow-hidden">
+            <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
+              <TabsList className="grid w-full grid-cols-3 lg:w-[600px]">
+                <TabsTrigger value="appointments" className="flex items-center gap-2">
+                  <IconReport className="h-4 w-4" />
+                  Appointments
+                </TabsTrigger>
+                <TabsTrigger value="locks" className="flex items-center gap-2">
+                  <IconLock className="h-4 w-4" />
+                  Locks
+                </TabsTrigger>
+                <TabsTrigger value="realtime" className="flex items-center gap-2">
+                  <Edit3 className="h-4 w-4" />
+                  Real-time Editor
+                </TabsTrigger>
+              </TabsList>
+              
+              {/* Real-time connection status */}
+              <div className="flex items-center space-x-2">
+                {isConnected ? (
+                  <Badge variant="default" className="flex items-center space-x-1">
+                    <Wifi className="h-3 w-3" />
+                    <span>Connected</span>
+                  </Badge>
+                ) : (
+                  <Badge variant="destructive" className="flex items-center space-x-1">
+                    <WifiOff className="h-3 w-3" />
+                    <span>Disconnected</span>
+                  </Badge>
+                )}
+              </div>
+            </div>
+
+            {/* Appointment CRUD Tab */}
+            <TabsContent value="appointments" className="space-y-6 flex-1 overflow-y-auto">
+              <Appointment
+                userId={user?.id || ""}
+                onAppointmentSelect={handleLockAppointment}
+                onAppointmentEdit={handleRealtimeEdit}
+                selectedAppointmentId={selectedAppointment?.id}
+                refreshTrigger={refreshTrigger}
+              />
+            </TabsContent>
+
+            {/* Lock Management Tab */}
+            <TabsContent value="locks" className="space-y-6 flex-1 overflow-y-auto">
+              <LockProvider
+                appointmentId={selectedAppointment?.id}
+                userId={user?.id || ""}
+              >
+                <LockManagement
+                  selectedAppointmentId={selectedAppointment?.id}
+                  userId={user?.id || ""}
+                  userName={user?.name || ""}
+                  userEmail={user?.email || ""}
+                  userColor={userColor}
+                  isAdmin={isAdmin}
+                />
+              </LockProvider>
+            </TabsContent>
+
+            {/* Real-time Editor Tab */}
+            <TabsContent value="realtime" className="space-y-6 flex-1 overflow-y-auto">
+              {selectedAppointment ? (
+                <Card>
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <CardTitle className="flex items-center gap-2">
+                          <Edit3 className="h-5 w-5" />
+                          Real-time Appointment Editor
+                        </CardTitle>
+                        <CardDescription>
+                          Collaborate with other users in real-time to edit this appointment
+                        </CardDescription>
+                      </div>
+                      <Button 
+                        variant="outline" 
+                        onClick={handleExitRealtimeEdit}
+                        className="flex items-center gap-2"
+                      >
+                        <ArrowLeft className="h-4 w-4" />
+                        Back to List
+                      </Button>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <RealtimeAppointmentEditor
+                      appointmentId={selectedAppointment.id}
+                      userId={user?.id || ""}
+                      userName={user?.name || ""}
+                      userEmail={user?.email || ""}
+                      isAdmin={isAdmin}
+                      initialData={{
+                        id: selectedAppointment.id,
+                        title: selectedAppointment.title,
+                        description: selectedAppointment.description,
+                        date: new Date(selectedAppointment.startDate).toISOString().split('T')[0],
+                        time: new Date(selectedAppointment.startDate).toTimeString().slice(0, 5),
+                        location: selectedAppointment.location || '',
+                      }}
+                      onSave={handleRealtimeSave}
+                      onCancel={handleExitRealtimeEdit}
+                    />
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card>
+                  <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                    <Edit3 className="h-12 w-12 text-muted-foreground mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">No Appointment Selected</h3>
+                    <p className="text-muted-foreground mb-4">
+                      Select an appointment from the Appointments tab to start real-time editing
+                    </p>
+                    <Button 
+                      onClick={() => setActiveTab("appointments")}
+                      className="flex items-center gap-2"
+                    >
+                      <IconReport className="h-4 w-4" />
+                      Go to Appointments
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+            </TabsContent>
+          </Tabs>
+
         </div>
       </div>
     </div>
@@ -322,13 +456,22 @@ export default function Dashboard() {
 }
 
 const Logo = () => {
+  const { theme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const logoSrc = mounted && theme === "dark" ? "/logo.png" : "/logo-nobg.png";
+
   return (
     <a
       href="#"
       className="relative z-20 flex items-center justify-start space-x-2 py-1 text-md font-normal"
     >
       <Image
-        src="/logo-nobg.png"
+        src={logoSrc}
         className="shrink-0"
         width={28}
         height={28}
@@ -346,13 +489,22 @@ const Logo = () => {
 };
 
 const LogoIcon = () => {
+  const { theme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const logoSrc = mounted && theme === "dark" ? "/logo.png" : "/logo-nobg.png";
+
   return (
     <a
       href="#"
       className="relative z-20 flex items-center justify-start space-x-2 py-1 text-sm font-normal"
     >
       <Image
-        src="/logo-nobg.png"
+        src={logoSrc}
         className="shrink-0"
         alt="Logo"
         width={28}
@@ -361,3 +513,4 @@ const LogoIcon = () => {
     </a>
   );
 };
+

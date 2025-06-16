@@ -61,7 +61,7 @@ const SignIn: React.FC = () => {
       try {
         const res = await fetch("/api/auth/session");
         const data = await res.json();
-        if (data.valid) {
+        if (data && data.email) {
           router.replace("/dashboard");
         } else {
           setSessionLoading(false); // Session invalid, show sign-in form
@@ -100,8 +100,10 @@ const SignIn: React.FC = () => {
         // After login, verify session and redirect
         const sessionRes = await fetch("/api/auth/session");
         const sessionData = await sessionRes.json();
-        if (sessionData.valid) {
-          router.push("/dashboard");
+        if (sessionData && sessionData.email) {
+          await router.replace("/dashboard");
+        } else {
+          toast.error("Session validation failed. Please try again.");
         }
       }
     } catch (error) {
@@ -133,7 +135,7 @@ const SignIn: React.FC = () => {
         </div>
         <div className="relative z-10 max-w-lg text-center flex flex-col items-center">
           <blockquote className="text-2xl md:text-3xl font-semibold leading-snug mb-6 drop-shadow-lg">
-            “The key to becoming a great programmer is to write a lot of code and read a lot of code.”
+            &quot;The key to becoming a great programmer is to write a lot of code and read a lot of code.&quot;
           </blockquote>
           <span className="block text-lg font-medium opacity-90">– Peter Norvig</span>
         </div>

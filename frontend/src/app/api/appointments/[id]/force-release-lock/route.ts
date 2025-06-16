@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-export async function POST(
+export async function DELETE(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
@@ -10,7 +10,7 @@ export async function POST(
     const response = await fetch(
       `${process.env.BACKEND_API_URL}/appointments/${id}/force-release-lock`,
       {
-        method: 'POST',
+        method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
         },
