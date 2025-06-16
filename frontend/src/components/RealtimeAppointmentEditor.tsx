@@ -9,7 +9,6 @@ import { Badge } from './ui/badge';
 import { toast } from 'sonner';
 import { 
   Calendar, 
-  Clock, 
   MapPin, 
   User, 
   Save, 
@@ -26,6 +25,10 @@ import { useRealtimeAppointment } from '@/hooks/useRealtimeAppointment';
 import { useWebSocket } from '@/lib/websocket';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { TimePicker } from '@/components/time-picker';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import { format } from 'date-fns';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -67,6 +70,14 @@ export function RealtimeAppointmentEditor({
   onSave,
   onCancel,
 }: RealtimeAppointmentEditorProps) {
+  // Debug logging
+  useEffect(() => {
+    console.log('RealtimeAppointmentEditor - isAdmin:', isAdmin);
+    console.log('RealtimeAppointmentEditor - userId:', userId);
+    console.log('RealtimeAppointmentEditor - userName:', userName);
+    console.log('RealtimeAppointmentEditor - userEmail:', userEmail);
+  }, [isAdmin, userId, userName, userEmail]);
+
   const [formData, setFormData] = useState<AppointmentData>(
     initialData || {
       title: '',
@@ -156,34 +167,36 @@ export function RealtimeAppointmentEditor({
     }
   }, [forceReleaseLock, appointmentId, userId, isAdmin]);
 
-  // Handle takeover functionality
+  // Handle takeover functionality - immediate for admins
   const handleRequestTakeover = useCallback(async () => {
+    console.log('🔧 handleRequestTakeover called');
+    console.log('isAdmin:', isAdmin);
     if (!isAdmin) {
       // Non-admin users request control
       setShowTakeoverDialog(true);
       return;
     }
 
-    // Admin force takeover
+    // Admin gets immediate control via force takeover
     try {
       setTakeoverLoading(true);
-      await forceTakeover(appointmentId);
-      toast.success('Administrative takeover successful');
-      setShowTakeoverDialog(false);
+      await forceTakeover(appointmentId, userId, { name: userName, email: userEmail });
+      toast.success('Control taken successfully');
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to force takeover';
+      console.error('Failed to take control:', error);
+      const message = error instanceof Error ? error.message : 'Failed to take control';
       toast.error(message);
     } finally {
       setTakeoverLoading(false);
     }
-  }, [isAdmin, forceTakeover, appointmentId]);
+  }, [isAdmin, forceTakeover, appointmentId, userId, userName, userEmail]);
 
   const handleConfirmTakeover = useCallback(async () => {
     try {
       setTakeoverLoading(true);
       
       if (isAdmin) {
-        await forceTakeover(appointmentId);
+        await forceTakeover(appointmentId, userId, { name: userName, email: userEmail });
         toast.success('Administrative takeover successful');
       } else {
         await requestTakeover(appointmentId);
@@ -198,7 +211,7 @@ export function RealtimeAppointmentEditor({
     } finally {
       setTakeoverLoading(false);
     }
-  }, [isAdmin, forceTakeover, requestTakeover, appointmentId]);
+  }, [isAdmin, forceTakeover, requestTakeover, appointmentId, userId, userName, userEmail]);
 
   // Handle form submission
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
@@ -402,7 +415,7 @@ export function RealtimeAppointmentEditor({
               {/* Takeover Control Button */}
               {isLocked && !isCurrentUserLockOwner && (
                 <Button 
-                  variant={isAdmin ? "destructive" : "secondary"}
+                  variant={isAdmin ? "default" : "secondary"}
                   onClick={handleRequestTakeover} 
                   disabled={lockLoading || takeoverLoading}
                   className="flex items-center gap-2"
@@ -415,9 +428,9 @@ export function RealtimeAppointmentEditor({
                     <Users className="h-4 w-4" />
                   )}
                   {takeoverLoading ? (
-                    isAdmin ? 'Taking Over...' : 'Requesting...'
+                    isAdmin ? 'Taking Control...' : 'Requesting...'
                   ) : (
-                    isAdmin ? 'Force Takeover' : 'Request Control'
+                    'Request Control'
                   )}
                 </Button>
               )}
@@ -499,35 +512,47 @@ export function RealtimeAppointmentEditor({
             {/* Date and Time */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="date" className="flex items-center gap-2">
+                <Label className="flex items-center gap-2">
                   <Calendar className="h-4 w-4" />
                   Date *
                 </Label>
-                <Input
-                  id="date"
-                  name="date"
-                  type="date"
-                  value={formData.date}
-                  onChange={(e) => handleInputChange('date', e.target.value)}
-                  disabled={!canEdit}
-                  className={cn(!canEdit && "opacity-50 cursor-not-allowed")}
-                  required
-                />
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      disabled={!canEdit}
+                      className={cn(
+                        "w-full justify-start text-left font-normal",
+                        !formData.date && "text-muted-foreground",
+                        !canEdit && "opacity-50 cursor-not-allowed"
+                      )}
+                    >
+                      <Calendar className="mr-2 h-4 w-4" />
+                      {formData.date ? format(new Date(formData.date), "PPP") : "Pick a date"}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="start">
+                    <CalendarComponent
+                      mode="single"
+                      selected={formData.date ? new Date(formData.date) : undefined}
+                      onSelect={(date) => {
+                        if (date && canEdit) {
+                          handleInputChange('date', format(date, 'yyyy-MM-dd'));
+                        }
+                      }}
+                      initialFocus
+                      disabled={!canEdit}
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
               <div className="space-y-2">
-                <Label htmlFor="time" className="flex items-center gap-2">
-                  <Clock className="h-4 w-4" />
-                  Time *
-                </Label>
-                <Input
-                  id="time"
-                  name="time"
-                  type="time"
+                <TimePicker
+                  label="Time *"
                   value={formData.time}
-                  onChange={(e) => handleInputChange('time', e.target.value)}
+                  onChange={(time: string) => handleInputChange('time', time)}
                   disabled={!canEdit}
-                  className={cn(!canEdit && "opacity-50 cursor-not-allowed")}
-                  required
+                  placeholder="Select appointment time"
                 />
               </div>
             </div>

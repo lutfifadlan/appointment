@@ -136,4 +136,39 @@ export const updateUserPosition = async (req: Request, res: Response): Promise<R
   }
 };
 
+export const manualCleanup = async (req: Request, res: Response): Promise<Response | void> => {
+  try {
+    const response = await lockService.manualCleanup();
+    
+    if (!response.success) {
+      return res.status(500).json(response);
+    }
+    
+    res.status(200).json(response);
+  } catch (error) {
+    console.error('Error during manual cleanup:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+      cleanedCount: 0
+    });
+  }
+};
+
+export const getHealthStatus = async (req: Request, res: Response): Promise<Response | void> => {
+  try {
+    const healthStatus = lockService.getHealthStatus();
+    
+    res.status(200).json({
+      success: true,
+      data: healthStatus
+    });
+  } catch (error) {
+    console.error('Error getting health status:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Internal server error',
+    });
+  }
+};
 

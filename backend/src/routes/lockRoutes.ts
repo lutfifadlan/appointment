@@ -15,6 +15,13 @@ router.delete('/appointments/:id/release-lock', lockController.releaseLock);
 // Force release lock (admin only)
 router.delete('/appointments/:id/force-release-lock', lockController.forceReleaseLock);
 
+// Manual cleanup endpoint (admin only)
+router.post('/admin/locks/cleanup', lockController.manualCleanup);
+
+// Health status endpoint
+router.get('/locks/health', lockController.getHealthStatus);
+
+
 // Update user position (for collaborative cursors)
 router.post('/appointments/:id/update-position', lockController.updateUserPosition);
 

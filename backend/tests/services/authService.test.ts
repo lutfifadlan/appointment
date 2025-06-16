@@ -81,14 +81,16 @@ describe('AuthService', () => {
       const result = await authService.signup(
         'test@example.com',
         'Test User',
-        'password123'
+        'password123',
+        'user'
       );
 
       expect(mockRepository.findOne).toHaveBeenCalledWith({ where: { email: 'test@example.com' } });
       expect(mockRepository.create).toHaveBeenCalledWith({
         email: 'test@example.com',
         name: 'Test User',
-        hash_password: 'hashedpassword'
+        hash_password: 'hashedpassword',
+        role: 'user'
       });
       expect(mockRepository.save).toHaveBeenCalled();
       expect(bcrypt.hash).toHaveBeenCalledWith('password123', 10);
@@ -102,7 +104,7 @@ describe('AuthService', () => {
       mockRepository.findOne.mockResolvedValue(mockUser);
 
       await expect(
-        authService.signup('existing@example.com', 'Test User', 'password123')
+        authService.signup('existing@example.com', 'Test User', 'password123', 'user')
       ).rejects.toThrow('Email already in use');
     });
 
@@ -117,15 +119,15 @@ describe('AuthService', () => {
 
     it('should throw error if required fields are missing', async () => {
       await expect(
-        authService.signup('', 'Test User', 'password123')
+        authService.signup('', 'Test User', 'password123', 'user')
       ).rejects.toThrow('Email, name, and password are required');
 
       await expect(
-        authService.signup('test@example.com', '', 'password123')
+        authService.signup('test@example.com', '', 'password123', 'user')
       ).rejects.toThrow('Email, name, and password are required');
 
       await expect(
-        authService.signup('test@example.com', 'Test User', '')
+        authService.signup('test@example.com', 'Test User', '', 'user')
       ).rejects.toThrow('Email, name, and password are required');
     });
   });

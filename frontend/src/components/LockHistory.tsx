@@ -78,15 +78,15 @@ export function LockHistory({
   const getActionColor = (action: string) => {
     switch (action) {
       case 'acquired':
-        return 'bg-green-50 border-green-200';
+        return 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800';
       case 'released':
-        return 'bg-blue-50 border-blue-200';
+        return 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800';
       case 'expired':
-        return 'bg-yellow-50 border-yellow-200';
+        return 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800';
       case 'force_released':
-        return 'bg-red-50 border-red-200';
+        return 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800';
       default:
-        return 'bg-gray-50 border-gray-200';
+        return 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700';
     }
   };
 
@@ -100,15 +100,15 @@ export function LockHistory({
 
   if (error) {
     return (
-      <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-        <div className="flex items-center gap-2 text-red-700">
+      <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+        <div className="flex items-center gap-2 text-red-700 dark:text-red-400">
           <AlertTriangle className="h-4 w-4" />
           <span className="font-medium">Error loading lock history</span>
         </div>
-        <p className="text-red-600 text-sm mt-1">{error}</p>
+        <p className="text-red-600 dark:text-red-400 text-sm mt-1">{error}</p>
         <button
           onClick={refresh}
-          className="mt-2 px-3 py-1 bg-red-100 text-red-700 rounded text-sm hover:bg-red-200"
+          className="mt-2 px-3 py-1 bg-red-100 dark:bg-red-800 text-red-700 dark:text-red-200 rounded text-sm hover:bg-red-200 dark:hover:bg-red-700"
         >
           Try Again
         </button>
@@ -117,13 +117,13 @@ export function LockHistory({
   }
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
+    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
       {/* Header */}
-      <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
+      <div className="px-4 py-3 bg-gray-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Clock className="h-5 w-5 text-gray-600" />
-            <h3 className="font-medium text-gray-900">Lock History</h3>
+            <Clock className="h-5 w-5 text-gray-600 dark:text-gray-400" />
+            <h3 className="font-medium text-gray-900 dark:text-gray-100">Lock History</h3>
             {isLoading && (
               <RefreshCw className="h-4 w-4 text-gray-400 animate-spin" />
             )}
@@ -131,7 +131,7 @@ export function LockHistory({
           <div className="flex items-center gap-2">
             <button
               onClick={() => setShowExpanded(!showExpanded)}
-              className="flex items-center gap-1 px-2 py-1 text-sm text-gray-600 hover:text-gray-900"
+              className="flex items-center gap-1 px-2 py-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
             >
               {showExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
               {showExpanded ? 'Collapse' : 'Expand'}
@@ -139,7 +139,7 @@ export function LockHistory({
             <button
               onClick={refresh}
               disabled={isLoading}
-              className="px-2 py-1 text-sm text-gray-600 hover:text-gray-900 disabled:opacity-50"
+              className="px-2 py-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 disabled:opacity-50"
             >
               <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
             </button>
@@ -150,11 +150,11 @@ export function LockHistory({
         {showExpanded && (
           <div className="mt-3 flex flex-wrap gap-2">
             <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-gray-500" />
+              <Filter className="h-4 w-4 text-gray-500 dark:text-gray-400" />
               <select
                 value={filterAction}
                 onChange={(e) => setFilterAction(e.target.value)}
-                className="text-sm border border-gray-300 rounded px-2 py-1"
+                className="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
               >
                 <option value="all">All Actions</option>
                 <option value="acquired">Acquired</option>
@@ -164,13 +164,13 @@ export function LockHistory({
               </select>
             </div>
             <div className="flex items-center gap-2">
-              <Search className="h-4 w-4 text-gray-500" />
+              <Search className="h-4 w-4 text-gray-500 dark:text-gray-400" />
               <input
                 type="text"
                 placeholder="Search users..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="text-sm border border-gray-300 rounded px-2 py-1 w-40"
+                className="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1 w-40 bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400"
               />
             </div>
           </div>
@@ -179,27 +179,27 @@ export function LockHistory({
 
       {/* Statistics */}
       {showStatistics && statistics && showExpanded && (
-        <div className="px-4 py-3 bg-blue-50 border-b border-gray-200">
+        <div className="px-4 py-3 bg-blue-50 dark:bg-blue-900/20 border-b border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-2 mb-2">
-            <BarChart3 className="h-4 w-4 text-blue-600" />
-            <span className="font-medium text-blue-900">Statistics</span>
+            <BarChart3 className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            <span className="font-medium text-blue-900 dark:text-blue-100">Statistics</span>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
             <div>
-              <div className="text-gray-600">Total Acquisitions</div>
-              <div className="font-medium text-gray-900">{statistics.totalAcquisitions}</div>
+              <div className="text-gray-600 dark:text-gray-400">Total Acquisitions</div>
+              <div className="font-medium text-gray-900 dark:text-gray-100">{statistics.totalAcquisitions}</div>
             </div>
             <div>
-              <div className="text-gray-600">Avg Duration</div>
-              <div className="font-medium text-gray-900">{formatDuration(statistics.averageDuration)}</div>
+              <div className="text-gray-600 dark:text-gray-400">Avg Duration</div>
+              <div className="font-medium text-gray-900 dark:text-gray-100">{formatDuration(statistics.averageDuration)}</div>
             </div>
             <div>
-              <div className="text-gray-600">Expired Locks</div>
-              <div className="font-medium text-gray-900">{statistics.totalExpired}</div>
+              <div className="text-gray-600 dark:text-gray-400">Expired Locks</div>
+              <div className="font-medium text-gray-900 dark:text-gray-100">{statistics.totalExpired}</div>
             </div>
             <div>
-              <div className="text-gray-600">Active Users</div>
-              <div className="font-medium text-gray-900">{statistics.uniqueUsers}</div>
+              <div className="text-gray-600 dark:text-gray-400">Active Users</div>
+              <div className="font-medium text-gray-900 dark:text-gray-100">{statistics.uniqueUsers}</div>
             </div>
           </div>
         </div>
@@ -208,8 +208,8 @@ export function LockHistory({
       {/* History List */}
       <div className="overflow-hidden">
         {isEmpty ? (
-          <div className="p-8 text-center text-gray-500">
-            <Clock className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+          <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+            <Clock className="h-12 w-12 mx-auto mb-3 text-gray-300 dark:text-gray-600" />
             <p>No lock history found</p>
             <p className="text-sm">Lock activities will appear here once users interact with this appointment</p>
           </div>
@@ -218,7 +218,7 @@ export function LockHistory({
             {filteredHistory.map((item) => (
               <div
                 key={item.id}
-                className={`p-4 border-b border-gray-100 hover:bg-gray-50 ${getActionColor(item.action)}`}
+                className={`p-4 border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 ${getActionColor(item.action)}`}
               >
                 <div className="flex items-start gap-3">
                   <div className="flex-shrink-0 mt-0.5">
@@ -227,14 +227,14 @@ export function LockHistory({
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <span className="font-medium text-gray-900">{item.userName}</span>
-                        <span className="text-sm text-gray-500">{item.userEmail}</span>
+                        <span className="font-medium text-gray-900 dark:text-gray-100">{item.userName}</span>
+                        <span className="text-sm text-gray-500 dark:text-gray-400">{item.userEmail}</span>
                       </div>
-                      <span className="text-sm text-gray-500">
+                      <span className="text-sm text-gray-500 dark:text-gray-400">
                         {format(new Date(item.timestamp), 'MMM d, h:mm a')}
                       </span>
                     </div>
-                    <div className="mt-1 flex items-center gap-4 text-sm text-gray-600">
+                    <div className="mt-1 flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
                       <span className="capitalize">{item.action.replace('_', ' ')}</span>
                       {item.duration && (
                         <span>Duration: {formatDuration(item.duration)}</span>
@@ -243,7 +243,7 @@ export function LockHistory({
                         <span>Released by: {item.releasedBy}</span>
                       )}
                       {item.metadata?.optimisticLocking && (
-                        <span className="text-blue-600">Optimistic Locking</span>
+                        <span className="text-blue-600 dark:text-blue-400">Optimistic Locking</span>
                       )}
                     </div>
                   </div>
@@ -255,11 +255,11 @@ export function LockHistory({
 
         {/* Load More */}
         {hasMore && showExpanded && (
-          <div className="p-4 border-t border-gray-200 bg-gray-50">
+          <div className="p-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
             <button
               onClick={loadMore}
               disabled={isLoading}
-              className="w-full px-4 py-2 text-sm text-gray-600 hover:text-gray-900 disabled:opacity-50"
+              className="w-full px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 disabled:opacity-50"
             >
               {isLoading ? 'Loading...' : 'Load More'}
             </button>
@@ -268,7 +268,7 @@ export function LockHistory({
 
         {/* Pagination Info */}
         {totalPages > 1 && showExpanded && (
-          <div className="px-4 py-2 bg-gray-50 border-t border-gray-200 text-sm text-gray-600">
+          <div className="px-4 py-2 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 text-sm text-gray-600 dark:text-gray-400">
             Page {currentPage} of {totalPages}
           </div>
         )}

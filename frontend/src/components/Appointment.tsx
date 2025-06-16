@@ -8,8 +8,9 @@ import { Badge } from '@/components/ui/badge';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { TimePicker } from '@/components/time-picker';
 import { toast } from 'sonner';
-import { Calendar, Clock, MapPin, User, Save, Plus, Edit, Trash2, Eye, CalendarIcon, Lock, Unlock, Clock as ClockIcon, AlertTriangle } from 'lucide-react';
+import { Calendar, Clock, MapPin, User, Save, Plus, Edit, Trash2, CalendarIcon, Lock, Unlock, Clock as ClockIcon, AlertTriangle } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -48,10 +49,12 @@ interface LockInfo {
   expiresAt?: string;
 }
 
-interface AppointmentCRUDProps {
+interface AppointmentProps {
   userId: string;
   onAppointmentSelect?: (appointment: Appointment) => void;
+  onAppointmentEdit?: (appointment: Appointment) => void;
   selectedAppointmentId?: string;
+  refreshTrigger?: number;
 }
 
 // Real-time lock-aware form wrapper component with WebSocket integration
@@ -281,11 +284,13 @@ function LockAwareForm({
   );
 }
 
-export function AppointmentCRUD({
+export function Appointment({
   userId,
   onAppointmentSelect,
+  onAppointmentEdit,
   selectedAppointmentId,
-}: AppointmentCRUDProps) {
+  refreshTrigger,
+}: AppointmentProps) {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [formData, setFormData] = useState({
@@ -304,6 +309,13 @@ export function AppointmentCRUD({
   useEffect(() => {
     fetchAppointments();
   }, []);
+
+  // Refresh appointments when refreshTrigger changes
+  useEffect(() => {
+    if (refreshTrigger && refreshTrigger > 0) {
+      fetchAppointments();
+    }
+  }, [refreshTrigger]);
 
   const fetchAppointments = async () => {
     try {
@@ -368,22 +380,14 @@ export function AppointmentCRUD({
   };
 
   const handleEdit = (appointment: Appointment) => {
-    // Check if appointment is locked by someone else
-    const lockStatus = lockStatuses[appointment.id];
-    if (lockStatus?.isLocked && lockStatus.lockedBy !== userId) {
-      toast.error(`This appointment is currently being edited by ${lockStatus.lockedBy}`);
-      return;
-    }
-
-    // Redirect to real-time editor tab instead of editing locally
-    if (onAppointmentSelect) {
-      onAppointmentSelect(appointment);
+    // Navigate to real-time editor regardless of lock status
+    // Users can view locked appointments in read-only mode
+    if (onAppointmentEdit) {
+      onAppointmentEdit(appointment);
     } else {
       toast.error('Real-time editor is not available');
     }
   };
-
-
 
   const handleSave = useCallback(async () => {
     if (!formData.title.trim()) {
@@ -567,16 +571,11 @@ export function AppointmentCRUD({
                     </Popover>
                   </div>
                   <div className="space-y-2">
-                    <Label htmlFor="time" className="flex items-center gap-2">
-                      <Clock className="h-4 w-4" />
-                      Time *
-                    </Label>
-                    <Input
-                      id="time"
-                      type="time"
+                    <TimePicker
+                      label="Time *"
                       value={formData.time}
-                      onChange={(e) => handleInputChange('time', e.target.value)}
-                      required
+                      onChange={(time) => handleInputChange('time', time)}
+                      placeholder="Select appointment time"
                     />
                   </div>
                 </div>
@@ -618,7 +617,6 @@ export function AppointmentCRUD({
                       <SelectValue placeholder="Select status" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="draft">Draft</SelectItem>
                       <SelectItem value="scheduled">Scheduled</SelectItem>
                       <SelectItem value="completed">Completed</SelectItem>
                       <SelectItem value="cancelled">Cancelled</SelectItem>
@@ -759,25 +757,15 @@ export function AppointmentCRUD({
                           onClick={() => onAppointmentSelect?.(appointment)}
                           className="flex items-center gap-1"
                         >
-                          <Eye className="h-3 w-3" />
-                          Select
+                          <Lock className="h-3 w-3" />
+                          Lock
                         </Button>
                         <Button
                           variant="ghost"
                           size="sm"
                           onClick={() => handleEdit(appointment)}
-                          disabled={lockStatuses[appointment.id]?.isLocked && lockStatuses[appointment.id]?.lockedBy !== userId}
-                          className={cn(
-                            "flex items-center gap-1",
-                            lockStatuses[appointment.id]?.isLocked && lockStatuses[appointment.id]?.lockedBy !== userId
-                              ? "opacity-50 cursor-not-allowed"
-                              : ""
-                          )}
-                          title={
-                            lockStatuses[appointment.id]?.isLocked && lockStatuses[appointment.id]?.lockedBy !== userId
-                              ? `Currently being edited by ${lockStatuses[appointment.id]?.lockedBy}`
-                              : "Edit appointment"
-                          }
+                          className="flex items-center gap-1"
+                          title="View/Edit appointment in real-time editor"
                         >
                           <Edit className="h-3 w-3" />
                           Edit

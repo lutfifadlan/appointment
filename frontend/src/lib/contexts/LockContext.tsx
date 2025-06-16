@@ -99,12 +99,21 @@ export const LockProvider: React.FC<LockProviderProps> = ({
     });
 
     // Listen for lock release
-    newSocket.on('lock-released', (data: { appointmentId: string }) => {
+    newSocket.on('lock-released', (data: { appointmentId: string; reason?: string; byAdmin?: boolean }) => {
       if (data.appointmentId === appointmentId) {
+        console.log('🔓 Lock released:', data.reason || 'User released');
         setCurrentLock(null);
         setIsLocked(false);
         setIsCurrentUserLockOwner(false);
         setCurrentVersion(0);
+        resetVersionConflict();
+
+        // Show notification based on the reason for lock release
+        if (data.reason === 'expired') {
+          console.warn('⏰ Your lock has expired due to inactivity');
+        } else if (data.byAdmin) {
+          console.warn('👮 Your lock was released by an administrator');
+        }
       }
     });
 
@@ -115,12 +124,27 @@ export const LockProvider: React.FC<LockProviderProps> = ({
       adminInfo: { name: string; email: string } 
     }) => {
       if (data.appointmentId === appointmentId) {
+        console.log('👮 Admin takeover by:', data.adminInfo.name);
         setCurrentLock(null);
         setIsLocked(false);
         setIsCurrentUserLockOwner(false);
         setCurrentVersion(0);
+        resetVersionConflict();
+        
         // Show notification about admin takeover
-        console.log(`Admin ${data.adminInfo.name} has taken control of this appointment`);
+        console.warn(`Admin ${data.adminInfo.name} has taken control of this appointment`);
+      }
+    });
+
+    // Listen for automatic cleanup notifications
+    newSocket.on('lock-expired', (data: { appointmentId: string; expiredLock: AppointmentLock }) => {
+      if (data.appointmentId === appointmentId && data.expiredLock.userId === userId) {
+        console.warn('⏰ Your lock has expired automatically due to inactivity');
+        setCurrentLock(null);
+        setIsLocked(false);
+        setIsCurrentUserLockOwner(false);
+        setCurrentVersion(0);
+        resetVersionConflict();
       }
     });
 
@@ -154,16 +178,51 @@ export const LockProvider: React.FC<LockProviderProps> = ({
   }, [appointmentId, userId, disabled]);
 
   // Auto-refresh lock every 4 minutes to prevent expiration (which happens at 5 minutes)
+  // This also ensures version incrementation happens regularly
   useEffect(() => {
     if (!isCurrentUserLockOwner || !appointmentId || !userId || !currentLock) return;
 
-    const interval = setInterval(() => {
-      // Re-acquire the lock to refresh it with current version
-      acquireLock(appointmentId, userId, {
-        name: currentLock.userInfo.name,
-        email: currentLock.userInfo.email
-      }, currentVersion);
-    }, 4 * 60 * 1000); // 4 minutes
+    const refreshLock = async () => {
+      console.log('🔄 Auto-refreshing lock to prevent expiration...');
+      
+      try {
+        const response = await fetch(`/api/appointments/${appointmentId}/acquire-lock`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            userId, 
+            userInfo: {
+              name: currentLock.userInfo.name,
+              email: currentLock.userInfo.email
+            },
+            expectedVersion: currentVersion
+          }),
+        });
+        
+        const refreshResult: LockResponse = await response.json();
+
+        if (refreshResult.success && refreshResult.lock) {
+          console.log('✅ Lock auto-refresh successful, version:', refreshResult.lock.version);
+          setCurrentLock(refreshResult.lock);
+          setCurrentVersion(refreshResult.lock.version);
+          resetVersionConflict();
+        } else {
+          console.warn('⚠️ Lock auto-refresh failed:', refreshResult.message);
+          
+          // If auto-refresh fails, it might mean someone else has the lock now
+          if (refreshResult.conflictDetails) {
+            setVersionConflictCount(prev => prev + 1);
+            setCurrentVersion(refreshResult.conflictDetails.currentVersion);
+          }
+        }
+      } catch (error) {
+        console.error('❌ Lock auto-refresh error:', error);
+      }
+    };
+
+    const interval = setInterval(refreshLock, 4 * 60 * 1000); // 4 minutes
 
     return () => clearInterval(interval);
   }, [isCurrentUserLockOwner, appointmentId, userId, currentLock, currentVersion]);

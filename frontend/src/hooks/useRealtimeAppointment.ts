@@ -60,9 +60,31 @@ export const useRealtimeAppointment = (
     return colors[index];
   }, []);
 
+  // Fetch initial lock status
+  const fetchInitialLockStatus = useCallback(async () => {
+    if (!appointmentId) return;
+    
+    try {
+      const response = await fetch(`/api/appointments/${appointmentId}/lock-status`);
+      if (response.ok) {
+        const data = await response.json();
+        if (data.lock) {
+          console.log('📄 Initial lock status:', data.lock);
+          setCurrentLock(data.lock);
+        } else {
+          setCurrentLock(null);
+        }
+        setLockError(null);
+      }
+    } catch (error) {
+      console.error('Failed to fetch initial lock status:', error);
+      setLockError('Failed to fetch lock status');
+    }
+  }, [appointmentId]);
+
   // Initialize WebSocket connection
   useEffect(() => {
-    if (!appointmentId || process.env.NODE_ENV === 'test') return;
+    if (!appointmentId) return;
 
     const wsUrl = process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:8088';
     
@@ -83,6 +105,9 @@ export const useRealtimeAppointment = (
         
         // Auto-subscribe to current appointment
         socket.emit('subscribe', appointmentId);
+        
+        // Fetch initial lock status
+        fetchInitialLockStatus();
       });
 
       socket.on('connect_error', (error) => {
@@ -175,7 +200,7 @@ export const useRealtimeAppointment = (
       console.error('Failed to initialize WebSocket:', error);
       setLockError('Failed to connect to real-time server');
     }
-  }, [appointmentId, userId, getUserColor]);
+  }, [appointmentId, userId, getUserColor, fetchInitialLockStatus]);
 
   // Subscribe to appointment updates
   const subscribeToAppointment = useCallback((appointmentId: string) => {
@@ -289,7 +314,7 @@ export const useRealtimeAppointment = (
 
     try {
       const response = await fetch(`/api/appointments/${appointmentId}/force-release-lock`, {
-        method: 'POST',
+        method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
         },

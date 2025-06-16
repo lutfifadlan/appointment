@@ -1,319 +1,238 @@
-# Appointment Frontend - Enhanced Lock Management System
+# Appointment UI - Frontend
 
-This frontend application provides a comprehensive collaborative editing experience for appointments with real-time lock management, collaborative cursors, and admin controls.
+A modern, responsive appointment management application built with Next.js 15, React 19, and TypeScript. This frontend provides an intuitive interface for managing appointments with real-time collaboration features and conflict prevention.
 
-## ✅ Implemented Features
+## 🚀 Features
 
-### 🔒 Lock Awareness
-- **Visual Indicators**: Clear lock status with animated indicators
-- **Form Disabling**: Automatic form disabling when not lock owner
-- **Lock Timer**: Real-time countdown of lock expiration
-- **Lock Owner Display**: Shows current editor's identity and activity status
+### Core Functionality
+- **Smart Appointment Scheduling** - Create, view, and manage appointments with an intuitive interface
+- **Real-time Collaboration** - See live cursor positions and edits from other users
+- **Conflict Prevention** - Intelligent locking system prevents double-bookings and editing conflicts
+- **User Authentication** - Secure login and registration system
+- **Dashboard** - Comprehensive overview of all appointments and scheduling activities
 
-### 🔄 Real-Time Updates
-- **WebSocket Connection**: Instant lock status synchronization
-- **Loading States**: Visual feedback during lock operations
-- **Connection Status**: Online/offline indicators
-- **Auto-reconnection**: Handles connection drops gracefully
+### UI/UX Features
+- **Modern Design** - Clean, professional interface with dark/light mode support
+- **Responsive Layout** - Optimized for desktop, tablet, and mobile devices
+- **Interactive Animations** - Smooth transitions with Framer Motion
+- **Real-time Notifications** - Toast notifications for important updates
+- **Typewriter Effects** - Engaging landing page with animated text
+- **Confetti Celebrations** - Delightful user feedback for successful actions
 
-### 👥 Collaborative Features
-- **Live Cursors**: See other users' mouse positions in real-time
-- **Following Pointer**: Enhanced Aceternity UI cursor tracking
-- **User Indicators**: Visual badges showing active collaborators
-- **Rate-limited Updates**: Optimized cursor position updates
+### Technical Features
+- **Real-time Updates** - WebSocket integration for live collaboration
+- **Form Validation** - Robust form handling with React Hook Form and Zod
+- **Date Management** - Advanced date picking and formatting with date-fns
+- **Theme Support** - Seamless dark/light mode switching
+- **Component Library** - Custom UI components built on Radix UI primitives
 
-### 🛡️ Admin Controls
-- **Force Takeover**: Admin-only forced lock acquisition
-- **Confirmation Dialogs**: Safety prompts for destructive actions
-- **Request Control**: Non-admin users can request lock control
-- **Audit Trail**: Administrative actions are logged
+## 🛠️ Tech Stack
 
-### 🔧 Technical Features
-- **Optimistic Locking**: Version-based conflict resolution
-- **Rate Limiting**: Prevents abuse with 5 attempts per minute
-- **Input Sanitization**: WebSocket message validation
-- **Error Handling**: Comprehensive error recovery
-- **Auto-save**: Periodic saving with heartbeat mechanism
-- **Tab Close Handling**: Automatic lock release on page unload
+### Core Technologies
+- **Next.js 15.3.3** - React framework with App Router
+- **React 19** - Latest React with concurrent features
+- **TypeScript 5** - Type-safe development
+- **Tailwind CSS 4** - Utility-first CSS framework
 
-## 🚀 Quick Start
+### UI & Components
+- **Radix UI** - Accessible, unstyled UI primitives
+  - Dialog, Dropdown, Select, Checkbox, and more
+- **Lucide React** - Beautiful, customizable icons
+- **Tabler Icons** - Additional icon set
+- **Framer Motion** - Smooth animations and transitions
+- **Canvas Confetti** - Celebration effects
 
-### Basic Usage
+### Forms & Validation
+- **React Hook Form** - Performant forms with easy validation
+- **Zod** - TypeScript-first schema validation
+- **@hookform/resolvers** - Integration between React Hook Form and Zod
 
-```tsx
-import { AppointmentEditor } from '@/components/AppointmentEditor';
+### Real-time & Networking
+- **Socket.IO Client** - Real-time bidirectional communication
+- **React Day Picker** - Advanced date selection component
 
-function MyPage() {
-  return (
-    <AppointmentEditor
-      appointmentId="appointment-123"
-      userId="user-456"
-      userName="John Doe"
-      userEmail="john@example.com"
-      isAdmin={false}
-      initialData={{
-        title: "Team Meeting",
-        description: "Weekly sync",
-        date: "2024-01-15",
-        time: "14:00",
-        location: "Conference Room A"
-      }}
-    />
-  );
-}
+### Styling & Theming
+- **Next Themes** - Theme management (dark/light mode)
+- **Class Variance Authority** - Component variant management
+- **Tailwind Merge** - Smart Tailwind class merging
+- **CLSX** - Conditional className utility
+
+### Development Tools
+- **ESLint** - Code linting and formatting
+- **PostCSS** - CSS processing
+
+## 📦 Installation
+
+### Prerequisites
+- Node.js 18+ and npm/yarn
+- Backend server running (see backend README)
+
+### Setup
+
+1. **Clone the repository**
+   ```bash
+   git clone <repository-url>
+   cd appointment/frontend
+   ```
+
+2. **Install dependencies**
+   ```bash
+   npm install
+   # or
+   yarn install
+   ```
+
+3. **Configure environment**
+   ```bash
+   # Create .env.local file with your backend URL
+   NEXT_PUBLIC_API_URL=http://localhost:3001
+   NEXT_PUBLIC_WS_URL=http://localhost:3001
+   ```
+
+4. **Start development server**
+   ```bash
+   npm run dev
+   # or
+   yarn dev
+   ```
+
+5. **Open in browser**
+   ```
+   http://localhost:3000
+   ```
+
+## 🚀 Available Scripts
+
+- `npm run dev` - Start development server
+- `npm run build` - Build production application
+- `npm run start` - Start production server
+- `npm run lint` - Run ESLint for code quality
+
+## 📁 Project Structure
+
+```
+src/
+├── app/                    # Next.js App Router
+│   ├── dashboard/         # Main dashboard page
+│   ├── auth/              # Authentication pages
+│   ├── api/               # API routes (if any)
+│   ├── contact-us/        # Contact page
+│   ├── privacy-policy/    # Privacy policy page
+│   ├── terms-of-service/  # Terms of service page
+│   ├── layout.tsx         # Root layout
+│   ├── page.tsx           # Landing page
+│   ├── globals.css        # Global styles
+│   └── providers.tsx      # Context providers
+├── components/            # Reusable UI components
+│   ├── ui/               # Base UI components (Radix-based)
+│   ├── custom-ui/        # Custom components
+│   └── common-layout.tsx # Shared layout component
+├── hooks/                # Custom React hooks
+├── lib/                  # Utility functions and configurations
+├── constants/            # Application constants
+└── types/               # TypeScript type definitions
 ```
 
-### Advanced Usage with Custom Form
+## 🎨 UI Components
 
-```tsx
-import { LockedForm } from '@/components/LockedForm';
-import { LockIndicator } from '@/components/LockIndicator';
+### Custom Components
+- **GetStartedButton** - Call-to-action button with animations
+- **LeftToRightArrow** - Animated directional indicator
+- **TypewriterEffect** - Animated text typing effect
+- **CommonLayout** - Shared page layout with navigation
 
-function CustomAppointmentForm() {
-  const handleLockAcquired = () => {
-    console.log('Lock acquired - user can edit');
-  };
-
-  const handleLockConflict = (lockedBy: string) => {
-    console.log(`Conflict: ${lockedBy} is editing`);
-  };
-
-  const handleFormSubmit = async (formData: FormData) => {
-    // Custom save logic
-    const response = await fetch('/api/save', {
-      method: 'POST',
-      body: formData,
-    });
-    return response.ok;
-  };
-
-  return (
-    <LockedForm
-      appointmentId="appointment-123"
-      userId="user-456"
-      userName="John Doe"
-      userColor="#3b82f6"
-      isAdmin={true}
-      onLockAcquired={handleLockAcquired}
-      onLockConflict={handleLockConflict}
-      onFormSubmit={handleFormSubmit}
-      enableCollaborativeCursors={true}
-    >
-      {/* Your form fields here */}
-      <input name="title" placeholder="Appointment title" />
-      <textarea name="description" placeholder="Description" />
-      <button type="submit">Save</button>
-    </LockedForm>
-  );
-}
-```
-
-## 🎯 Component API
-
-### `<AppointmentEditor>`
-Complete appointment editing solution with all features enabled.
-
-| Prop | Type | Required | Description |
-|------|------|----------|-------------|
-| `appointmentId` | `string` | ✅ | Unique appointment identifier |
-| `userId` | `string` | ✅ | Current user's ID |
-| `userName` | `string` | ✅ | Display name for cursors |
-| `userEmail` | `string` | ✅ | User email for tooltips |
-| `isAdmin` | `boolean` | ❌ | Enable admin features |
-| `initialData` | `object` | ❌ | Pre-populate form fields |
-
-### `<LockedForm>`
-Core lock management wrapper for forms.
-
-| Prop | Type | Required | Description |
-|------|------|----------|-------------|
-| `appointmentId` | `string` | ✅ | Unique appointment identifier |
-| `userId` | `string` | ✅ | Current user's ID |
-| `userName` | `string` | ✅ | Display name |
-| `userColor` | `string` | ✅ | Hex color for cursor |
-| `isAdmin` | `boolean` | ❌ | Enable admin controls |
-| `onLockAcquired` | `function` | ❌ | Lock acquired callback |
-| `onLockReleased` | `function` | ❌ | Lock released callback |
-| `onLockConflict` | `function` | ❌ | Lock conflict callback |
-| `onFormSubmit` | `function` | ❌ | Custom save handler |
-| `enableCollaborativeCursors` | `boolean` | ❌ | Show live cursors |
-| `className` | `string` | ❌ | Additional CSS classes |
-
-### `<LockIndicator>`
-Standalone lock status display with controls.
-
-| Prop | Type | Required | Description |
-|------|------|----------|-------------|
-| `appointmentId` | `string` | ✅ | Unique appointment identifier |
-| `isAdmin` | `boolean` | ❌ | Show admin controls |
-| `showTakeoverButton` | `boolean` | ❌ | Display takeover button |
-| `onLockStatusChange` | `function` | ❌ | Status change callback |
-
-### `<CollaborativeCursor>`
-Real-time cursor tracking component.
-
-| Prop | Type | Required | Description |
-|------|------|----------|-------------|
-| `userId` | `string` | ✅ | Current user's ID |
-| `userName` | `string` | ✅ | Display name |
-| `userColor` | `string` | ✅ | Hex color code |
-| `appointmentId` | `string` | ✅ | Appointment scope |
-| `isEnabled` | `boolean` | ❌ | Enable cursor tracking |
+### Base Components (Radix UI)
+- Alert Dialog, Avatar, Checkbox, Dialog
+- Dropdown Menu, Label, Popover, Select
+- Separator, Tabs, and more
 
 ## 🔧 Configuration
 
-### Environment Variables
+### Tailwind CSS
+The project uses Tailwind CSS 4 with custom configurations:
+- Custom color palette
+- Responsive breakpoints
+- Animation utilities
+- Dark mode support
 
-```env
-# Backend API URL for WebSocket connections
-NEXT_PUBLIC_BACKEND_API_URL=ws://localhost:3001
+### ESLint
+Configured with Next.js recommended rules and TypeScript support.
 
-# Rate limiting configuration
-NEXT_PUBLIC_LOCK_RATE_LIMIT=5
-NEXT_PUBLIC_LOCK_RATE_WINDOW=60000
+### TypeScript
+Strict type checking enabled with custom type definitions.
 
-# Auto-save interval (milliseconds)
-NEXT_PUBLIC_AUTOSAVE_INTERVAL=30000
-```
+## 🌐 Environment Variables
 
-### WebSocket Events
-
-#### Client → Server
-- `join-appointment`: Join appointment room
-- `leave-appointment`: Leave appointment room
-- `acquire-lock`: Request lock acquisition
-- `release-lock`: Release current lock
-- `force-takeover`: Admin force takeover
-- `cursor-move`: Update cursor position
-- `heartbeat`: Keep lock alive
-
-#### Server → Client
-- `lock-update`: Lock status changed
-- `lock-conflict`: Lock acquisition failed
-- `lock-expired`: Lock expired due to inactivity
-- `cursor-update`: Other user's cursor moved
-- `user-disconnected`: User left the room
-
-## 🛡️ Security Features
-
-### Rate Limiting
-- **Lock Attempts**: 5 attempts per minute per user
-- **Cursor Updates**: 50ms throttle between updates
-- **Heartbeat**: 30-second intervals for lock keepalive
-
-### Input Sanitization
-- WebSocket message validation
-- String length limits (userId: 50 chars, userName: 100 chars)
-- Color code validation (hex format)
-- Coordinate boundary checking
-
-### Conflict Resolution
-- **Optimistic Locking**: Version-based updates
-- **Race Condition Handling**: Server-side lock validation
-- **Stale Lock Cleanup**: Automatic expiration after 5 minutes
-- **Connection Recovery**: Automatic reconnection on network issues
-
-## 🎨 Styling
-
-The components use Tailwind CSS with CSS variables for theming:
-
-```css
-/* Custom lock status colors */
-.lock-available { @apply text-green-500; }
-.lock-occupied { @apply text-red-500; }
-.lock-expiring { @apply text-yellow-500; }
-
-/* Cursor colors */
-.cursor-pointer { 
-  filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
-}
-```
-
-## 🧪 Testing
-
-### Unit Tests
 ```bash
-npm run test:unit
+# Required
+NEXT_PUBLIC_API_URL=http://localhost:3001
+NEXT_PUBLIC_WS_URL=http://localhost:3001
+
+# Optional
+NEXT_PUBLIC_APP_NAME="Appointment Manager"
 ```
 
-### Integration Tests
+## 🔄 Real-time Features
+
+The application integrates with the backend WebSocket server to provide:
+- Live cursor tracking during appointment editing
+- Real-time lock status updates
+- Instant notifications for appointment changes
+- Collaborative editing indicators
+
+## 🎯 Key Pages
+
+### Landing Page (`/`)
+- Hero section with typewriter effect
+- Feature highlights
+- Call-to-action buttons
+- Responsive grid layout
+
+### Dashboard (`/dashboard`)
+- Appointment overview
+- Real-time collaboration features
+- Appointment creation and editing
+- Lock status indicators
+
+### Authentication (`/auth`)
+- Login and registration forms
+- Form validation with Zod
+- Secure authentication flow
+
+## 🚀 Deployment
+
+### Production Build
 ```bash
-npm run test:integration
+npm run build
+npm run start
 ```
 
-### E2E Tests
+### Docker Deployment
 ```bash
-npm run test:e2e
+# Build Docker image
+docker build -t appointment-frontend .
+
+# Run container
+docker run -p 3000:3000 appointment-frontend
 ```
-
-## 📱 Browser Support
-
-- Chrome 90+
-- Firefox 88+
-- Safari 14+
-- Edge 90+
-
-## 🚀 Performance
-
-### Optimizations
-- **Debounced Updates**: Cursor positions debounced to 50ms
-- **Message Batching**: Multiple cursor updates batched together
-- **Memory Management**: Automatic cleanup of stale cursors
-- **Connection Pooling**: Efficient WebSocket connection reuse
-
-### Metrics
-- **Lock Acquisition**: < 100ms average
-- **Cursor Updates**: < 50ms latency
-- **Memory Usage**: < 2MB per active session
-- **CPU Usage**: < 1% during normal operation
-
-## 🔍 Troubleshooting
-
-### Common Issues
-
-**Lock not acquired**
-- Check WebSocket connection status
-- Verify user has proper permissions
-- Check rate limiting (wait 1 minute between failed attempts)
-
-**Cursors not showing**
-- Ensure `enableCollaborativeCursors={true}`
-- Check WebSocket connection
-- Verify users are in the same appointment room
-
-**Admin controls not visible**
-- Confirm `isAdmin={true}` prop is set
-- Check user role in authentication context
-
-**Form not saving**
-- Ensure user has acquired lock first
-- Check network connectivity
-- Verify form data validation
-
-### Debug Mode
-Enable debug logging:
-```tsx
-// Add to your component
-useEffect(() => {
-  window.DEBUG_LOCKS = true;
-}, []);
-```
-
-## 📝 License
-
-MIT License - see LICENSE file for details.
 
 ## 🤝 Contributing
 
 1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/amazing-feature`
-3. Commit your changes: `git commit -m 'Add amazing feature'`
-4. Push to the branch: `git push origin feature/amazing-feature`
-5. Open a Pull Request
+2. Create a feature branch
+3. Make your changes
+4. Add tests if applicable
+5. Submit a pull request
 
-## 📞 Support
+## 📄 License
 
-For questions or issues:
-- Create an issue on GitHub
-- Check the troubleshooting guide above
-- Review the component API documentation
+This project is licensed under the MIT License.
+
+## 🔗 Related
+
+- [Backend Repository](../backend) - The API server and WebSocket service
+- [Live Demo](#) - See the application in action
+
+---
+
+Built with ❤️ using Next.js, React, and TypeScript 

@@ -247,7 +247,7 @@ export const useAppointmentLock = (appointmentId: string) => {
 
     try {
       const response = await fetch(`/api/appointments/${appointmentId}/force-release-lock`, {
-        method: 'POST',
+        method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',
         },

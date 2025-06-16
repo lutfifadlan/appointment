@@ -6,11 +6,6 @@ export const useSocket = () => {
   const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
-    // Only initialize socket if we're not in a test environment
-    if (process.env.NODE_ENV === 'test') {
-      return;
-    }
-
     try {
       // Initialize socket connection
       socketRef.current = io(process.env.NEXT_PUBLIC_WS_URL || 'http://localhost:8088', {

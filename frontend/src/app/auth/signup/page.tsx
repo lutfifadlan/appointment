@@ -14,6 +14,7 @@ import { Particles } from '@/components/magicui/particles';
 import { cn } from '@/lib/utils';
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Eye, EyeOff } from 'lucide-react';
 import { Common } from '@/constants';
 
@@ -22,6 +23,7 @@ const SignUp: React.FC = () => {
     name: '',
     email: '',
     password: '',
+    role: 'user',
     consent: false,
   });
   const [isLoading, setIsLoading] = useState(false);
@@ -44,7 +46,7 @@ const SignUp: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const { name, email, password, consent } = formData;
+    const { name, email, password, role, consent } = formData;
 
     if (!consent) {
       toast("Consent Required");
@@ -62,7 +64,7 @@ const SignUp: React.FC = () => {
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password }),
+        body: JSON.stringify({ name, email, password, role }),
       });
 
       if (res.ok) {
@@ -165,6 +167,21 @@ const SignUp: React.FC = () => {
                   {showPassword ? <EyeOff className="h-4 w-4 text-gray-500" /> : <Eye className="h-4 w-4 text-gray-500" />}
                 </button>
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="role">Role</Label>
+              <Select
+                value={formData.role}
+                onValueChange={(value) => setFormData(prev => ({ ...prev, role: value }))}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select your role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="user">User</SelectItem>
+                  <SelectItem value="admin">Admin</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <div className="flex flex-row items-center space-x-2">

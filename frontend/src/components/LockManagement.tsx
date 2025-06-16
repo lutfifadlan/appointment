@@ -15,8 +15,7 @@ import {
   CheckCircle,
   GitBranch,
   History,
-  Crown,
-  Users,
+  Clock,
 } from 'lucide-react';
 import {
   AlertDialog,
@@ -30,7 +29,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { useLock } from '@/lib/contexts/LockContext';
-import { useWebSocket } from '@/lib/websocket';
+
 import { LockHistory } from './LockHistory';
 import { format, formatDistanceToNow } from 'date-fns';
 
@@ -56,7 +55,7 @@ export function LockManagement({
     currentLock,
     lockLoading,
     lockError,
-    acquireLock,
+        acquireLock,
     releaseLock,
     forceReleaseLock,
     currentVersion,
@@ -64,21 +63,86 @@ export function LockManagement({
     resetVersionConflict,
   } = useLock();
 
-  // Add WebSocket takeover functionality
-  const { requestTakeover, forceTakeover } = useWebSocket();
-
   const [showVersionConflictAlert, setShowVersionConflictAlert] = useState(false);
-  const [showTakeoverDialog, setShowTakeoverDialog] = useState(false);
-  const [takeoverLoading, setTakeoverLoading] = useState(false);
   const [lastConflictCount, setLastConflictCount] = useState(0);
+  const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
+
+  // Calculate and update time remaining until lock expires
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    
+    if (currentLock?.expiresAt) {
+      const updateTimer = () => {
+        const now = new Date().getTime();
+        const expiresAt = new Date(currentLock.expiresAt).getTime();
+        const remaining = Math.max(0, expiresAt - now);
+        setTimeRemaining(remaining);
+        
+        if (remaining === 0) {
+          clearInterval(interval);
+        }
+      };
+
+      // Update immediately
+      updateTimer();
+      
+      // Then update every second
+      interval = setInterval(updateTimer, 1000);
+    } else {
+      setTimeRemaining(null);
+    }
+
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [currentLock?.expiresAt]);
+
+  // Format time remaining for display
+  const formatTimeRemaining = (ms: number | null): string => {
+    if (ms === null) return 'N/A';
+    if (ms === 0) return 'Expired';
+    
+    const totalSeconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    
+    if (minutes > 0) {
+      return `${minutes}m ${seconds}s`;
+    } else {
+      return `${seconds}s`;
+    }
+  };
+
+  // Get timer color based on remaining time
+  const getTimerColor = (ms: number | null): string => {
+    if (ms === null) return 'text-muted-foreground';
+    if (ms === 0) return 'text-red-600 font-semibold';
+    if (ms < 60000) return 'text-red-500 font-medium'; // Less than 1 minute
+    if (ms < 120000) return 'text-yellow-600 font-medium'; // Less than 2 minutes
+    return 'text-green-600 font-medium';
+  };
 
   // Show version conflict alert when version conflicts occur
   useEffect(() => {
     if (versionConflictCount > lastConflictCount) {
       setShowVersionConflictAlert(true);
       setLastConflictCount(versionConflictCount);
+      
+      // Show toast notification for version conflicts
+      toast.warning('Lock version conflict detected. Please refresh and try again.', {
+        duration: 5000,
+      });
     }
   }, [versionConflictCount, lastConflictCount]);
+
+  // Listen for lock expiration events
+  useEffect(() => {
+    if (!isCurrentUserLockOwner && currentLock && lockError?.includes('expired')) {
+      toast.warning('Your lock has expired due to inactivity. Please re-acquire the lock to continue editing.', {
+        duration: 8000,
+      });
+    }
+  }, [isCurrentUserLockOwner, currentLock, lockError]);
 
   const handleAcquireLock = useCallback(async () => {
     if (!selectedAppointmentId) {
@@ -156,57 +220,6 @@ export function LockManagement({
     setShowVersionConflictAlert(false);
     toast.info('Version conflict resolved. Please try your action again.');
   };
-
-  // Handle takeover functionality
-  const handleRequestTakeover = useCallback(async () => {
-    if (!selectedAppointmentId) {
-      toast.error('Please select an appointment first');
-      return;
-    }
-
-    if (!isAdmin) {
-      // Non-admin users request control
-      setShowTakeoverDialog(true);
-      return;
-    }
-
-    // Admin force takeover
-    try {
-      setTakeoverLoading(true);
-      await forceTakeover(selectedAppointmentId);
-      toast.success('Administrative takeover successful');
-      setShowTakeoverDialog(false);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to force takeover';
-      toast.error(message);
-    } finally {
-      setTakeoverLoading(false);
-    }
-  }, [selectedAppointmentId, isAdmin, forceTakeover]);
-
-  const handleConfirmTakeover = useCallback(async () => {
-    if (!selectedAppointmentId) return;
-
-    try {
-      setTakeoverLoading(true);
-      
-      if (isAdmin) {
-        await forceTakeover(selectedAppointmentId);
-        toast.success('Administrative takeover successful');
-      } else {
-        await requestTakeover(selectedAppointmentId);
-        toast.success('Takeover request sent to administrators');
-        toast.info('You will be notified when your request is processed');
-      }
-      
-      setShowTakeoverDialog(false);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to process takeover';
-      toast.error(message);
-    } finally {
-      setTakeoverLoading(false);
-    }
-  }, [selectedAppointmentId, isAdmin, forceTakeover, requestTakeover]);
 
   const getLockStatusColor = () => {
     if (!isLocked) return 'bg-gray-100 text-gray-800 border-gray-200';
@@ -299,7 +312,7 @@ export function LockManagement({
                 {currentLock && (
                   <div className="text-sm opacity-75 mt-1">
                     {isCurrentUserLockOwner ? 
-                      `Expires ${formatDistanceToNow(new Date(currentLock.expiresAt), { addSuffix: true })}` :
+                      `Expires ${formatTimeRemaining(timeRemaining)}` :
                       `Locked ${formatDistanceToNow(new Date(currentLock.createdAt), { addSuffix: true })} • ${currentLock.userInfo.email}`
                     }
                   </div>
@@ -307,9 +320,16 @@ export function LockManagement({
               </div>
             </div>
             <div className="text-right">
-              <Badge variant="secondary" className="text-sm font-medium">
+              <Badge variant="secondary" className={getTimerColor(timeRemaining)}>
                 {!isLocked ? 'Unlocked' : 
-                 isCurrentUserLockOwner ? 'Your Lock' : 'Locked'}
+                 isCurrentUserLockOwner ? (
+                   timeRemaining !== null ? (
+                     <span className="flex items-center gap-1">
+                       <Clock className="h-3 w-3" />
+                       {formatTimeRemaining(timeRemaining)}
+                     </span>
+                   ) : 'Your Lock'
+                 ) : 'Locked'}
               </Badge>
             </div>
           </div>
@@ -319,6 +339,24 @@ export function LockManagement({
             <Alert variant="destructive" className="mt-4">
               <AlertTriangle className="h-4 w-4" />
               <AlertDescription>{lockError}</AlertDescription>
+            </Alert>
+          )}
+
+          {/* Lock Expiration Warning */}
+          {isCurrentUserLockOwner && timeRemaining !== null && timeRemaining > 0 && timeRemaining < 120000 && (
+            <Alert variant={timeRemaining < 60000 ? "destructive" : "default"} className="mt-4">
+              <Clock className="h-4 w-4" />
+              <AlertDescription>
+                {timeRemaining < 60000 ? (
+                  <span className="font-semibold">
+                    ⚠️ Your lock expires in {formatTimeRemaining(timeRemaining)}! Save your work or refresh the lock.
+                  </span>
+                ) : (
+                  <span>
+                    Your lock expires in {formatTimeRemaining(timeRemaining)}. It will auto-refresh in the background.
+                  </span>
+                )}
+              </AlertDescription>
             </Alert>
           )}
 
@@ -347,7 +385,7 @@ export function LockManagement({
                 <Unlock className="h-4 w-4" />
                 {lockLoading ? 'Releasing...' : 'Release Lock'}
               </Button>
-            )}
+                        )}
 
             {isLocked && !isCurrentUserLockOwner && isAdmin && (
               <AlertDialog>
@@ -382,29 +420,7 @@ export function LockManagement({
                 </AlertDialogContent>
               </AlertDialog>
             )}
-
-            {/* Takeover Control Button */}
-            {isLocked && !isCurrentUserLockOwner && (
-              <Button
-                onClick={handleRequestTakeover}
-                disabled={lockLoading || takeoverLoading}
-                variant={isAdmin ? "destructive" : "secondary"}
-                className="flex items-center gap-2"
-                size="default"
-              >
-                {isAdmin ? (
-                  <>
-                    <Crown className="h-4 w-4" />
-                    {takeoverLoading ? 'Taking Over...' : 'Force Takeover'}
-                  </>
-                ) : (
-                  <>
-                    <Users className="h-4 w-4" />
-                    {takeoverLoading ? 'Requesting...' : 'Request Control'}
-                  </>
-                )}
-              </Button>
-            )}
+ 
           </div>
 
           {/* Lock Details */}
@@ -478,58 +494,7 @@ export function LockManagement({
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Takeover Confirmation Dialog */}
-      <AlertDialog open={showTakeoverDialog} onOpenChange={setShowTakeoverDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              {isAdmin ? (
-                <>
-                  <Crown className="h-5 w-5 text-red-500" />
-                  Force Takeover Lock
-                </>
-              ) : (
-                <>
-                  <Users className="h-5 w-5 text-blue-500" />
-                  Request Lock Control
-                </>
-              )}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {isAdmin ? (
-                <>
-                  This will immediately remove the lock from{' '}
-                  <strong>{currentLock?.userInfo.name}</strong> and grant it to you.
-                  This action cannot be undone and the current user will lose
-                  any unsaved changes.
-                </>
-              ) : (
-                <>
-                  This will send a request to administrators to take control
-                  of this appointment from <strong>{currentLock?.userInfo.name}</strong>.
-                  You will be notified when your request is processed.
-                </>
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={takeoverLoading}>
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleConfirmTakeover}
-              disabled={takeoverLoading}
-              className={isAdmin ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90' : ''}
-            >
-              {takeoverLoading ? (
-                isAdmin ? 'Forcing Takeover...' : 'Sending Request...'
-              ) : (
-                isAdmin ? 'Force Takeover' : 'Send Request'
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+
     </div>
   );
 } 

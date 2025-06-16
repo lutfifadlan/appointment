@@ -15,8 +15,10 @@ export interface IWebsocketService {
 
 export class LockService {
   private readonly LOCK_EXPIRY_MS = 5 * 60 * 1000; // 5 minutes
+  private readonly CLEANUP_INTERVAL_MS = 60 * 1000; // 1 minute
   private lockRepository: Repository<AppointmentLockEntity>;
   private websocketService: IWebsocketService;
+  private cleanupInterval: NodeJS.Timeout | null = null;
 
   constructor(
     repository?: Repository<AppointmentLockEntity>,
@@ -24,6 +26,100 @@ export class LockService {
   ) {
     this.lockRepository = repository || AppDataSource.getRepository(AppointmentLockEntity);
     this.websocketService = wsService || websocketService;
+    
+    // Start the background cleanup process
+    this.startBackgroundCleanup();
+  }
+
+  /**
+   * Start the background cleanup process
+   */
+  private startBackgroundCleanup(): void {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+    }
+    
+    this.cleanupInterval = setInterval(async () => {
+      try {
+        await this.cleanupAllExpiredLocks();
+      } catch (error) {
+        console.error('Background lock cleanup failed:', error);
+      }
+    }, this.CLEANUP_INTERVAL_MS);
+    
+    console.log('Background lock cleanup started - running every minute');
+  }
+
+  /**
+   * Stop the background cleanup process
+   */
+  public stopBackgroundCleanup(): void {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+      console.log('Background lock cleanup stopped');
+    }
+  }
+
+  /**
+   * Clean up all expired locks across all appointments
+   */
+  private async cleanupAllExpiredLocks(): Promise<void> {
+    const now = new Date();
+    
+    try {
+      // Find all expired locks
+      const expiredLocks = await this.lockRepository.find({
+        where: {
+          expiresAt: LessThan(now)
+        }
+      });
+
+      if (expiredLocks.length === 0) {
+        return;
+      }
+
+      console.log(`Found ${expiredLocks.length} expired locks to clean up`);
+
+      // Process each expired lock
+      for (const lock of expiredLocks) {
+        try {
+          // Calculate duration before removing the lock
+          const duration = Math.floor((now.getTime() - lock.createdAt.getTime()) / 1000);
+          
+          // Record expired lock in history
+          await lockHistoryService.recordLockAction(
+            lock.appointmentId,
+            lock.userId,
+            lock.userInfo.name,
+            lock.userInfo.email,
+            LockAction.EXPIRED,
+            {
+              duration,
+              lockId: lock.id,
+              metadata: {
+                userAgent: 'background-cleanup',
+                sessionId: lock.id,
+                expiredAt: now.toISOString(),
+                automaticCleanup: true
+              }
+            }
+          );
+
+          // Remove the expired lock
+          await this.lockRepository.remove(lock);
+
+          // Notify clients about the lock release
+          this.websocketService.notifyLockReleased(lock.appointmentId);
+          
+          console.log(`Cleaned up expired lock for appointment ${lock.appointmentId} (user: ${lock.userInfo.name})`);
+        } catch (error) {
+          console.error(`Failed to clean up expired lock ${lock.id}:`, error);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to query expired locks:', error);
+    }
   }
   
   /**
@@ -177,12 +273,20 @@ export class LockService {
       
       let lockEntity: AppointmentLockEntity;
       let isNewLock = false;
+      let isLockRenewal = false;
       
       if (existingLock) {
-        // Update existing lock - TypeORM will automatically increment version
+        // Always update existing lock to extend expiry and increment version
+        // This ensures every lock operation increments the version for proper optimistic locking
         existingLock.expiresAt = expiresAt;
         existingLock.userInfo = { ...existingLock.userInfo, ...userInfo };
+        
+        // Force a version increment by updating a timestamp or touching the record
+        // TypeORM @VersionColumn will automatically increment on save()
         lockEntity = await this.lockRepository.save(existingLock);
+        isLockRenewal = true;
+        
+        console.log(`🔄 Lock renewed for ${appointmentId} by ${userInfo.name} - version ${existingLock.version} → ${lockEntity.version}`);
       } else {
         // Create a new lock entity
         lockEntity = new AppointmentLockEntity();
@@ -194,31 +298,37 @@ export class LockService {
         // Save to database (version will be set to 1 automatically)
         lockEntity = await this.lockRepository.save(lockEntity);
         isNewLock = true;
+        
+        console.log(`🔒 New lock created for ${appointmentId} by ${userInfo.name} - version ${lockEntity.version}`);
       }
       
       const lock = this.entityToLock(lockEntity);
       
-      // Record lock acquisition in history (only for new locks)
-      if (isNewLock) {
+      // Record lock acquisition in history (for new locks and significant renewals)
+      if (isNewLock || (isLockRenewal && expectedVersion !== undefined)) {
         try {
+          const action = isNewLock ? LockAction.ACQUIRED : LockAction.ACQUIRED; // Could add LockAction.RENEWED
           await lockHistoryService.recordLockAction(
             appointmentId,
             userId,
             userInfo.name,
             userInfo.email,
-            LockAction.ACQUIRED,
+            action,
             {
               lockId: lockEntity.id,
               metadata: {
                 userAgent: 'backend-service',
                 sessionId: lockEntity.id,
                 optimisticLocking: true,
-                expectedVersion: expectedVersion
+                expectedVersion: expectedVersion,
+                actualVersion: lockEntity.version,
+                isRenewal: isLockRenewal,
+                timestamp: now.toISOString()
               }
             }
           );
         } catch (error) {
-          console.error('Failed to record lock acquisition in history:', error);
+          console.error('Failed to record lock action in history:', error);
           // Don't fail the lock acquisition if history recording fails
         }
       }
@@ -422,6 +532,115 @@ export class LockService {
   }
 
   /**
+   * Admin takeover - force release current lock and immediately acquire it for admin
+   */
+  async adminTakeover(appointmentId: string, adminId: string, adminInfo: { name: string; email: string }): Promise<LockResponse> {
+    // In a real application, we would verify that adminId belongs to an admin user
+    
+    try {
+      // First check if there's an existing lock
+      const existingLock = await this.lockRepository.findOne({
+        where: { appointmentId }
+      });
+
+      // If there's an existing lock, record the force release
+      if (existingLock) {
+        const duration = Math.floor((new Date().getTime() - existingLock.createdAt.getTime()) / 1000);
+        
+        try {
+          await lockHistoryService.recordLockAction(
+            appointmentId,
+            existingLock.userId,
+            existingLock.userInfo.name,
+            existingLock.userInfo.email,
+            LockAction.FORCE_RELEASED,
+            {
+              duration,
+              releasedBy: adminId,
+              lockId: existingLock.id,
+              metadata: {
+                userAgent: 'backend-service',
+                sessionId: existingLock.id,
+                adminAction: true,
+                reason: 'Admin takeover'
+              }
+            }
+          );
+        } catch (error) {
+          console.error('Failed to record force release in history:', error);
+        }
+
+        // Remove the existing lock
+        await this.lockRepository.remove(existingLock);
+      }
+
+      // Create new lock for admin
+      const now = new Date();
+      const expiresAt = new Date(now.getTime() + 5 * 60 * 1000); // 5 minutes
+
+      const newLock = this.lockRepository.create({
+        appointmentId,
+        userId: adminId,
+        userInfo: adminInfo,
+        createdAt: now,
+        expiresAt: expiresAt,
+        version: 1, // Start with version 1 for new admin lock
+      });
+
+      const savedLock = await this.lockRepository.save(newLock);
+
+      // Record lock acquisition in history
+      try {
+        await lockHistoryService.recordLockAction(
+          appointmentId,
+          adminId,
+          adminInfo.name,
+          adminInfo.email,
+          LockAction.ACQUIRED,
+          {
+            lockId: savedLock.id,
+            duration: 0,
+            metadata: {
+              userAgent: 'backend-service',
+              sessionId: savedLock.id,
+              adminAction: true,
+              reason: 'Admin takeover'
+            }
+          }
+        );
+      } catch (error) {
+        console.error('Failed to record lock acquisition in history:', error);
+      }
+
+      // Create the lock response
+      const lockResponse: AppointmentLock = {
+        appointmentId: savedLock.appointmentId,
+        userId: savedLock.userId,
+        userInfo: savedLock.userInfo,
+        createdAt: savedLock.createdAt,
+        expiresAt: savedLock.expiresAt,
+        version: savedLock.version,
+      };
+
+      // Notify all clients about the new lock
+      this.websocketService.notifyLockAcquired(appointmentId, lockResponse);
+
+      return {
+        success: true,
+        message: `Admin takeover successful`,
+        lock: lockResponse,
+      };
+
+    } catch (error) {
+      console.error('Error during admin takeover:', error);
+      return {
+        success: false,
+        message: 'Failed to perform admin takeover',
+      };
+    }
+  }
+
+  /**
    * Update user position (for collaborative cursors) with optimistic locking support
    */
   async updateUserPosition(
@@ -500,7 +719,61 @@ export class LockService {
     }
   }
 
+  /**
+   * Manually trigger cleanup of expired locks (useful for testing or manual maintenance)
+   */
+  async manualCleanup(): Promise<{ success: boolean; message: string; cleanedCount: number }> {
+    try {
+      const initialCount = await this.lockRepository.count();
+      await this.cleanupAllExpiredLocks();
+      const finalCount = await this.lockRepository.count();
+      const cleanedCount = initialCount - finalCount;
+      
+      return {
+        success: true,
+        message: `Manual cleanup completed. Removed ${cleanedCount} expired locks.`,
+        cleanedCount
+      };
+    } catch (error) {
+      console.error('Manual cleanup failed:', error);
+      return {
+        success: false,
+        message: 'Manual cleanup failed',
+        cleanedCount: 0
+      };
+    }
+  }
 
+  /**
+   * Get lock service health status
+   */
+  getHealthStatus(): { 
+    isRunning: boolean; 
+    backgroundCleanupActive: boolean; 
+    uptime: number;
+    lastCleanupTime?: Date;
+  } {
+    return {
+      isRunning: true,
+      backgroundCleanupActive: this.cleanupInterval !== null,
+      uptime: process.uptime(),
+      lastCleanupTime: new Date() // In a real implementation, we'd track the actual last cleanup time
+    };
+  }
 }
 
 export default new LockService();
+
+// Handle graceful shutdown
+const handleProcessExit = () => {
+  console.log('Shutting down lock service...');
+  const lockServiceInstance = require('./lockService').default;
+  if (lockServiceInstance && typeof lockServiceInstance.stopBackgroundCleanup === 'function') {
+    lockServiceInstance.stopBackgroundCleanup();
+  }
+};
+
+// Register cleanup handlers
+process.on('SIGINT', handleProcessExit);
+process.on('SIGTERM', handleProcessExit);
+process.on('exit', handleProcessExit);

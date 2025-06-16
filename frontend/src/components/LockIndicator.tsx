@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useWebSocket } from '@/lib/websocket';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { 
   AlertDialog,
@@ -30,6 +31,7 @@ export function LockIndicator({
   onLockStatusChange 
 }: LockIndicatorProps) {
   const { lockState, acquireLock, releaseLock, requestTakeover, forceTakeover } = useWebSocket();
+  const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [timeRemaining, setTimeRemaining] = useState<number | null>(null);
   const [showTakeoverDialog, setShowTakeoverDialog] = useState(false);
@@ -109,7 +111,7 @@ export function LockIndicator({
   };
 
   const handleTakeover = async (confirmed: boolean = false) => {
-    if (!confirmed && isAdmin) {
+    if (!confirmed && !isAdmin) {
       setShowTakeoverDialog(true);
       return;
     }
@@ -119,7 +121,7 @@ export function LockIndicator({
       setShowTakeoverDialog(false);
       
       if (isAdmin) {
-        await forceTakeover(appointmentId);
+        await forceTakeover(appointmentId, user?.id || '', { name: user?.name || '', email: user?.email || '' });
         toast.success('Administrative takeover successful');
       } else {
         await requestTakeover(appointmentId);

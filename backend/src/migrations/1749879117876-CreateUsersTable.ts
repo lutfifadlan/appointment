@@ -30,6 +30,11 @@ export class CreateUsersTable1749879117876 implements MigrationInterface {
                         isNullable: false,
                     },
                     {
+                        name: 'role',
+                        type: 'varchar',
+                        default: 'user',
+                    },
+                    {
                         name: 'created_at',
                         type: 'timestamp',
                         default: 'CURRENT_TIMESTAMP',

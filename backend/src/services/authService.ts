@@ -9,6 +9,7 @@ interface UserData {
   id: string;
   email: string;
   name: string;
+  role: string;
   created_at: Date;
   updated_at: Date;
 }
@@ -58,9 +59,10 @@ export class AuthService {
    * @param email - User's email address
    * @param name - User's full name
    * @param password - User's password
+   * @param role - User's role (optional, defaults to 'user')
    * @throws {AuthError} If email is already in use
    */
-  async signup(email: string, name: string, password: string): Promise<UserResponse> {
+  async signup(email: string, name: string, password: string, role: string = 'user'): Promise<UserResponse> {
     try {
       // Validate input
       if (!email || !name || !password) {
@@ -82,7 +84,8 @@ export class AuthService {
       const user = this.userRepository.create({
         email,
         name,
-        hash_password: hashedPassword
+        hash_password: hashedPassword,
+        role
       });
 
       const savedUser = await this.userRepository.save(user);

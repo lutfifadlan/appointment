@@ -1,7 +1,8 @@
 {
   "info": {
     "name": "Appointment API",
-    "description": "API collection for the Appointment application",
+    "description": "Complete API collection for the Appointment application with lock management and real-time collaboration features",
+    "version": "2.0.0",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -227,6 +228,37 @@
           }
         },
         {
+          "name": "Update Appointment",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"title\": \"Updated Team Meeting\",\n    \"description\": \"Updated weekly team sync\",\n    \"startDate\": \"2024-03-20T10:00:00Z\",\n    \"endDate\": \"2024-03-20T11:00:00Z\",\n    \"status\": \"scheduled\",\n    \"location\": \"Conference Room B\"\n}"
+            },
+            "url": {
+              "raw": "{{api_base_url}}/v1/appointments/:id",
+              "host": ["{{api_base_url}}"],
+              "path": ["v1", "appointments", ":id"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "appointment-uuid"
+                }
+              ]
+            }
+          }
+        },
+        {
           "name": "Delete Appointment",
           "request": {
             "method": "DELETE",
@@ -252,7 +284,8 @@
       ]
     },
     {
-      "name": "Locks",
+      "name": "Lock Management",
+      "description": "Appointment locking mechanism for preventing concurrent edits",
       "item": [
         {
           "name": "Get Lock Status",
@@ -275,7 +308,122 @@
                 }
               ]
             }
-          }
+          },
+          "response": [
+            {
+              "name": "Lock Status - Unlocked",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{api_base_url}}/v1/appointments/:id/lock-status",
+                  "host": ["{{api_base_url}}"],
+                  "path": ["v1", "appointments", ":id", "lock-status"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [],
+              "cookie": [],
+              "body": "{\n    \"success\": true,\n    \"message\": \"Appointment is not locked\"\n}"
+            },
+            {
+              "name": "Lock Status - Locked",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{api_base_url}}/v1/appointments/:id/lock-status",
+                  "host": ["{{api_base_url}}"],
+                  "path": ["v1", "appointments", ":id", "lock-status"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [],
+              "cookie": [],
+              "body": "{\n    \"success\": true,\n    \"message\": \"Appointment is locked\",\n    \"lock\": {\n        \"appointmentId\": \"appointment-uuid\",\n        \"userId\": \"user-uuid\",\n        \"userInfo\": {\n            \"name\": \"John Doe\",\n            \"email\": \"john@example.com\",\n            \"position\": { \"x\": 100, \"y\": 200 }\n        },\n        \"createdAt\": \"2024-01-01T12:00:00Z\",\n        \"expiresAt\": \"2024-01-01T12:05:00Z\",\n        \"version\": 1\n    }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Acquire Lock",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"userId\": \"user-uuid\",\n    \"userInfo\": {\n        \"name\": \"John Doe\",\n        \"email\": \"john@example.com\",\n        \"position\": {\n            \"x\": 100,\n            \"y\": 200\n        }\n    },\n    \"expectedVersion\": 0\n}"
+            },
+            "url": {
+              "raw": "{{api_base_url}}/v1/appointments/:id/acquire-lock",
+              "host": ["{{api_base_url}}"],
+              "path": ["v1", "appointments", ":id", "acquire-lock"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "appointment-uuid"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Lock Acquired Successfully",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"userId\": \"user-uuid\",\n    \"userInfo\": {\n        \"name\": \"John Doe\",\n        \"email\": \"john@example.com\"\n    }\n}"
+                },
+                "url": {
+                  "raw": "{{api_base_url}}/v1/appointments/:id/acquire-lock",
+                  "host": ["{{api_base_url}}"],
+                  "path": ["v1", "appointments", ":id", "acquire-lock"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [],
+              "cookie": [],
+              "body": "{\n    \"success\": true,\n    \"message\": \"Lock acquired successfully\",\n    \"lock\": {\n        \"appointmentId\": \"appointment-uuid\",\n        \"userId\": \"user-uuid\",\n        \"userInfo\": {\n            \"name\": \"John Doe\",\n            \"email\": \"john@example.com\"\n        },\n        \"createdAt\": \"2024-01-01T12:00:00Z\",\n        \"expiresAt\": \"2024-01-01T12:05:00Z\",\n        \"version\": 1\n    }\n}"
+            },
+            {
+              "name": "Lock Conflict - Already Locked",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"userId\": \"user-uuid-2\",\n    \"userInfo\": {\n        \"name\": \"Jane Doe\",\n        \"email\": \"jane@example.com\"\n    }\n}"
+                },
+                "url": {
+                  "raw": "{{api_base_url}}/v1/appointments/:id/acquire-lock",
+                  "host": ["{{api_base_url}}"],
+                  "path": ["v1", "appointments", ":id", "acquire-lock"]
+                }
+              },
+              "status": "Conflict",
+              "code": 409,
+              "_postman_previewlanguage": "json",
+              "header": [],
+              "cookie": [],
+              "body": "{\n    \"success\": false,\n    \"message\": \"Appointment is currently locked by John Doe\",\n    \"lock\": {\n        \"appointmentId\": \"appointment-uuid\",\n        \"userId\": \"user-uuid\",\n        \"userInfo\": {\n            \"name\": \"John Doe\",\n            \"email\": \"john@example.com\"\n        },\n        \"createdAt\": \"2024-01-01T12:00:00Z\",\n        \"expiresAt\": \"2024-01-01T12:05:00Z\",\n        \"version\": 1\n    },\n    \"conflictDetails\": {\n        \"currentVersion\": 1,\n        \"expectedVersion\": 0,\n        \"conflictingUser\": {\n            \"name\": \"John Doe\",\n            \"email\": \"john@example.com\"\n        }\n    }\n}"
+            }
+          ]
         },
         {
           "name": "Release Lock",
@@ -293,7 +441,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"userId\": \"user-uuid\"\n}"
+              "raw": "{\n    \"userId\": \"user-uuid\",\n    \"expectedVersion\": 1\n}"
             },
             "url": {
               "raw": "{{api_base_url}}/v1/appointments/:id/release-lock",
@@ -309,13 +457,13 @@
           }
         },
         {
-          "name": "Force Release Lock",
+          "name": "Force Release Lock (Admin)",
           "request": {
             "method": "DELETE",
             "header": [
               {
                 "key": "Authorization",
-                "value": "Bearer {{token}}"
+                "value": "Bearer {{admin_token}}"
               },
               {
                 "key": "Content-Type",
@@ -338,14 +486,372 @@
               ]
             }
           }
+        },
+        {
+          "name": "Admin Takeover",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{admin_token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"adminId\": \"admin-uuid\",\n    \"adminInfo\": {\n        \"name\": \"Administrator\",\n        \"email\": \"admin@example.com\"\n    }\n}"
+            },
+            "url": {
+              "raw": "{{api_base_url}}/v1/appointments/:id/admin-takeover",
+              "host": ["{{api_base_url}}"],
+              "path": ["v1", "appointments", ":id", "admin-takeover"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "appointment-uuid"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update User Position",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"userId\": \"user-uuid\",\n    \"position\": {\n        \"x\": 150,\n        \"y\": 300\n    },\n    \"expectedVersion\": 1\n}"
+            },
+            "url": {
+              "raw": "{{api_base_url}}/v1/appointments/:id/update-position",
+              "host": ["{{api_base_url}}"],
+              "path": ["v1", "appointments", ":id", "update-position"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "appointment-uuid"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Heartbeat",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"userId\": \"user-uuid\",\n    \"timestamp\": 1640995200000\n}"
+            },
+            "url": {
+              "raw": "{{api_base_url}}/v1/appointments/:id/heartbeat",
+              "host": ["{{api_base_url}}"],
+              "path": ["v1", "appointments", ":id", "heartbeat"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "appointment-uuid"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Lock History & Analytics",
+      "description": "Lock history tracking and analytics endpoints",
+      "item": [
+        {
+          "name": "Get Lock History",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_base_url}}/v1/appointments/:id/lock-history?limit=50&offset=0",
+              "host": ["{{api_base_url}}"],
+              "path": ["v1", "appointments", ":id", "lock-history"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "appointment-uuid"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Lock History Response",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{api_base_url}}/v1/appointments/:id/lock-history",
+                  "host": ["{{api_base_url}}"],
+                  "path": ["v1", "appointments", ":id", "lock-history"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [],
+              "cookie": [],
+              "body": "{\n    \"success\": true,\n    \"data\": {\n        \"history\": [\n            {\n                \"id\": \"history-uuid\",\n                \"appointmentId\": \"appointment-uuid\",\n                \"userId\": \"user-uuid\",\n                \"userName\": \"John Doe\",\n                \"userEmail\": \"john@example.com\",\n                \"action\": \"acquired\",\n                \"timestamp\": \"2024-01-01T12:00:00Z\",\n                \"duration\": 300,\n                \"lockId\": \"lock-uuid\",\n                \"metadata\": {\n                    \"userAgent\": \"backend-service\",\n                    \"sessionId\": \"session-uuid\",\n                    \"optimisticLocking\": true,\n                    \"expectedVersion\": 0,\n                    \"actualVersion\": 1\n                }\n            }\n        ],\n        \"total\": 1,\n        \"limit\": 50,\n        \"offset\": 0\n    }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Lock Statistics",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_base_url}}/v1/appointments/:id/lock-statistics",
+              "host": ["{{api_base_url}}"],
+              "path": ["v1", "appointments", ":id", "lock-statistics"],
+              "variable": [
+                {
+                  "key": "id",
+                  "value": "appointment-uuid"
+                }
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Lock Statistics Response",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{api_base_url}}/v1/appointments/:id/lock-statistics",
+                  "host": ["{{api_base_url}}"],
+                  "path": ["v1", "appointments", ":id", "lock-statistics"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [],
+              "cookie": [],
+              "body": "{\n    \"success\": true,\n    \"data\": {\n        \"totalAcquisitions\": 15,\n        \"totalReleases\": 12,\n        \"totalExpired\": 2,\n        \"totalForceReleases\": 1,\n        \"averageDuration\": 245,\n        \"uniqueUsers\": 5\n    }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get User Lock History",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_base_url}}/v1/users/:userId/lock-history?limit=20&offset=0",
+              "host": ["{{api_base_url}}"],
+              "path": ["v1", "users", ":userId", "lock-history"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20"
+                },
+                {
+                  "key": "offset",
+                  "value": "0"
+                }
+              ],
+              "variable": [
+                {
+                  "key": "userId",
+                  "value": "user-uuid"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Recent Activity",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{api_base_url}}/v1/lock-history/recent?limit=20",
+              "host": ["{{api_base_url}}"],
+              "path": ["v1", "lock-history", "recent"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "20"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "System",
+      "description": "System health and monitoring endpoints",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{api_base_url}}/health",
+              "host": ["{{api_base_url}}"],
+              "path": ["health"]
+            }
+          },
+          "response": [
+            {
+              "name": "Health Check Response",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{api_base_url}}/health",
+                  "host": ["{{api_base_url}}"],
+                  "path": ["health"]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [],
+              "cookie": [],
+              "body": "{\n    \"status\": \"healthy\",\n    \"timestamp\": \"2024-01-01T12:00:00Z\",\n    \"database\": \"connected\",\n    \"websocket\": \"active\",\n    \"version\": \"1.0.0\"\n}"
+            }
+          ]
         }
       ]
     }
   ],
   "variable": [
     {
+      "key": "api_base_url",
+      "value": "https://appointment.lutfifadlan.com/api",
+      "description": "Production API base URL"
+    },
+    {
+      "key": "local_api_base_url",
+      "value": "http://localhost:8088/api",
+      "description": "Local development API base URL"
+    },
+    {
       "key": "token",
-      "value": "your-jwt-token"
+      "value": "",
+      "description": "JWT token for authenticated requests"
+    },
+    {
+      "key": "admin_token",
+      "value": "",
+      "description": "JWT token for admin user requests"
+    },
+    {
+      "key": "appointment_uuid",
+      "value": "00000000-0000-0000-0000-000000000000",
+      "description": "Sample appointment UUID for testing"
+    },
+    {
+      "key": "user_uuid",
+      "value": "00000000-0000-0000-0000-000000000001",
+      "description": "Sample user UUID for testing"
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Auto-set timestamp for heartbeat requests",
+          "if (pm.request.url.toString().includes('/heartbeat')) {",
+          "    const body = JSON.parse(pm.request.body.raw);",
+          "    body.timestamp = Date.now();",
+          "    pm.request.body.raw = JSON.stringify(body);",
+          "}"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Auto-extract token from signin response",
+          "if (pm.request.url.toString().includes('/signin')) {",
+          "    if (pm.response.code === 200) {",
+          "        const response = pm.response.json();",
+          "        if (response.token) {",
+          "            pm.collectionVariables.set('token', response.token);",
+          "            console.log('Token saved to collection variables');",
+          "        }",
+          "    }",
+          "}",
+          "",
+          "// Common response validation",
+          "pm.test('Response should be JSON', function () {",
+          "    pm.response.to.be.json;",
+          "});",
+          "",
+          "pm.test('Response time is less than 5000ms', function () {",
+          "    pm.expect(pm.response.responseTime).to.be.below(5000);",
+          "});"
+        ]
+      }
     }
   ]
 } 

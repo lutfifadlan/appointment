@@ -14,7 +14,7 @@ interface WebSocketContextType {
   acquireLock: (appointmentId: string) => Promise<void>;
   releaseLock: (appointmentId: string) => Promise<void>;
   requestTakeover: (appointmentId: string) => Promise<void>;
-  forceTakeover: (appointmentId: string) => Promise<void>;
+  forceTakeover: (appointmentId: string, userId: string, userInfo: { name: string; email: string }) => Promise<void>;
 }
 
 const WebSocketContext = createContext<WebSocketContextType | null>(null);
@@ -95,10 +95,15 @@ export function WebSocketProvider({ children }: WebSocketProviderProps) {
     });
   };
 
-  const forceTakeover = async (appointmentId: string): Promise<void> => {
-    if (!socket) return;
+  const forceTakeover = async (appointmentId: string, userId: string, userInfo: { name: string; email: string }): Promise<void> => {
+    if (!socket) {
+      console.log('❌ No socket connection for forceTakeover');
+      return;
+    }
+    console.log('🚀 Sending forceTakeover:', { appointmentId, userId, userInfo });
     return new Promise((resolve, reject) => {
-      socket.emit('forceTakeover', { appointmentId }, (response: { success: boolean; error?: string }) => {
+      socket.emit('forceTakeover', { appointmentId, userId, userInfo }, (response: { success: boolean; error?: string }) => {
+        console.log('📨 forceTakeover response:', response);
         if (response.success) {
           resolve();
         } else {
