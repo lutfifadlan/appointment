@@ -26,8 +26,8 @@ export class LockHistoryEntity {
   userEmail!: string;
 
   @Column({
-    type: "enum",
-    enum: LockAction,
+    type: "varchar",
+    length: 50,
     default: LockAction.ACQUIRED
   })
   action!: LockAction;

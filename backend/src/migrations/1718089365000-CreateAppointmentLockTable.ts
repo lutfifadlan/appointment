@@ -37,6 +37,12 @@ export class CreateAppointmentLockTable1718089365000 implements MigrationInterfa
             name: "expires_at",
             type: "timestamp",
             isNullable: false
+          },
+          {
+            name: "version",
+            type: "integer",
+            default: 1,
+            isNullable: false
           }
         ]
       }),

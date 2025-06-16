@@ -42,6 +42,7 @@ const mockWebsocketService: IWebsocketService = {
 // Create the mock repository
 const mockRepository = {
   findOne: jest.fn(),
+  find: jest.fn(),
   delete: jest.fn(),
   save: jest.fn(),
   remove: jest.fn()
@@ -60,6 +61,7 @@ const createMockLock = (overrides = {}): AppointmentLockEntity => {
     userInfo: { name: 'Test User', email: 'test@example.com' },
     expiresAt: new Date(Date.now() + 3600000),
     createdAt: new Date(),
+    version: 1,
     ...overrides
   });
   return lock;
@@ -80,6 +82,7 @@ describe('LockService', () => {
   describe('getLockStatus', () => {
     it('should return not locked status when no lock exists', async () => {
       jest.spyOn(mockRepository, 'findOne').mockResolvedValue(null);
+      jest.spyOn(mockRepository, 'find').mockResolvedValue([]);
       jest.spyOn(mockRepository, 'delete').mockResolvedValue({ affected: 0, raw: [] });
 
       const result = await lockService.getLockStatus('test-appointment-id');
@@ -91,6 +94,12 @@ describe('LockService', () => {
         where: { 
           appointmentId: 'test-appointment-id',
           expiresAt: expect.objectContaining({ type: 'MoreThan' })
+        }
+      });
+      expect(mockRepository.find).toHaveBeenCalledWith({
+        where: {
+          appointmentId: 'test-appointment-id',
+          expiresAt: expect.objectContaining({ type: 'LessThan' })
         }
       });
       expect(mockRepository.delete).toHaveBeenCalledWith({
@@ -123,6 +132,8 @@ describe('LockService', () => {
         }
         return mockLock;
       });
+      jest.spyOn(mockRepository, 'find').mockResolvedValue([]);
+      jest.spyOn(mockRepository, 'delete').mockResolvedValue({ affected: 0, raw: [] });
       jest.spyOn(mockRepository, 'save').mockResolvedValue(mockLock);
 
       const result = await lockService.acquireLock('test-appointment-id', 'test-user-id', {
@@ -135,7 +146,8 @@ describe('LockService', () => {
       expect(result.lock).toEqual(expect.objectContaining({
         appointmentId: 'test-appointment-id',
         userId: 'test-user-id',
-        userInfo: { name: 'Test User', email: 'test@example.com' }
+        userInfo: { name: 'Test User', email: 'test@example.com' },
+        version: 1
       }));
       expect(mockRepository.findOne).toHaveBeenCalledWith({
         where: { 
@@ -176,13 +188,22 @@ describe('LockService', () => {
       expect(result.lock).toEqual(expect.objectContaining({
         appointmentId: 'test-appointment-id',
         userId: 'other-user-id',
-        userInfo: { name: 'Other User', email: 'other@example.com' }
+        userInfo: { name: 'Other User', email: 'other@example.com' },
+        version: 1
+      }));
+      expect(result.conflictDetails).toEqual(expect.objectContaining({
+        currentVersion: 1,
+        expectedVersion: 0,
+        conflictingUser: {
+          name: 'Other User',
+          email: 'other@example.com'
+        }
       }));
     });
 
     it('should update existing lock if owned by same user', async () => {
       const existingLock = createMockLock();
-      const updatedLock = createMockLock({ expiresAt: new Date(Date.now() + 7200000) });
+      const updatedLock = createMockLock({ expiresAt: new Date(Date.now() + 7200000), version: 2 });
       jest.spyOn(mockRepository, 'findOne').mockImplementation(async (options) => {
         const where = options?.where as { appointmentId?: string };
         if (where?.appointmentId === 'test-appointment-id') {
@@ -190,6 +211,8 @@ describe('LockService', () => {
         }
         return null;
       });
+      jest.spyOn(mockRepository, 'find').mockResolvedValue([]);
+      jest.spyOn(mockRepository, 'delete').mockResolvedValue({ affected: 0, raw: [] });
       jest.spyOn(mockRepository, 'save').mockResolvedValue(updatedLock);
 
       const result = await lockService.acquireLock('test-appointment-id', 'test-user-id', {
@@ -202,7 +225,8 @@ describe('LockService', () => {
       expect(result.lock).toEqual(expect.objectContaining({
         appointmentId: 'test-appointment-id',
         userId: 'test-user-id',
-        userInfo: { name: 'Test User', email: 'test@example.com' }
+        userInfo: { name: 'Test User', email: 'test@example.com' },
+        version: 2
       }));
       expect(mockRepository.save).toHaveBeenCalled();
     });

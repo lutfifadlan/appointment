@@ -2,16 +2,20 @@ import { MigrationInterface, QueryRunner, Table, TableIndex } from "typeorm";
 
 export class CreateLockHistoryTable1718089368000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
+    // Check if we're using SQLite for test environment
+    const isTestEnv = process.env.NODE_ENV === "test";
+    
     await queryRunner.createTable(
       new Table({
         name: "lock_history",
         columns: [
           {
             name: "id",
-            type: "uuid",
+            type: isTestEnv ? "varchar" : "uuid",
             isPrimary: true,
-            generationStrategy: "uuid",
-            default: "uuid_generate_v4()"
+            generationStrategy: isTestEnv ? undefined : "uuid",
+            default: isTestEnv ? undefined : "uuid_generate_v4()",
+            length: isTestEnv ? "36" : undefined
           },
           {
             name: "appointment_id",
@@ -35,15 +39,15 @@ export class CreateLockHistoryTable1718089368000 implements MigrationInterface {
           },
           {
             name: "action",
-            type: "enum",
-            enum: ["acquired", "released", "expired", "force_released"],
+            type: "varchar",
+            length: "50",
             default: "'acquired'",
             isNullable: false
           },
           {
             name: "timestamp",
-            type: "timestamp",
-            default: "now()"
+            type: isTestEnv ? "datetime" : "timestamp",
+            default: isTestEnv ? "CURRENT_TIMESTAMP" : "now()"
           },
           {
             name: "duration",
@@ -62,7 +66,7 @@ export class CreateLockHistoryTable1718089368000 implements MigrationInterface {
           },
           {
             name: "metadata",
-            type: "jsonb",
+            type: isTestEnv ? "text" : "jsonb",
             isNullable: true
           }
         ]

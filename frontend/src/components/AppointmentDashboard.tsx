@@ -2,7 +2,6 @@
 import React, { useState } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AppointmentCRUD } from './AppointmentCRUD';
-import { LockManagement } from './LockManagement';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Separator } from './ui/separator';
 import { Badge } from './ui/badge';
@@ -15,6 +14,7 @@ import {
   FileText,
   HelpCircle
 } from 'lucide-react';
+import { LockManagementOptimistic } from './LockManagementOptimistic';
 
 interface Appointment {
   id: string;
@@ -235,12 +235,11 @@ export function AppointmentDashboard({
               <Separator />
 
               {/* Lock Management Component */}
-              <LockManagement
+              <LockManagementOptimistic
                 selectedAppointmentId={selectedAppointment?.id}
                 userId={userId}
                 userName={userName}
                 userEmail={userEmail}
-                userColor={userColor}
                 isAdmin={isAdmin}
               />
             </div>

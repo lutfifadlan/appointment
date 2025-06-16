@@ -8,6 +8,7 @@ import websocketService from './services/websocketService';
 import { AppDataSource } from './config/data-source';
 import appointmentRoutes from './routes/appointmentRoutes';
 import lockRoutes from './routes/lockRoutes';
+import lockHistoryRoutes from './routes/lockHistoryRoutes';
 import authRoutes from './routes/authRoutes';
 import userRoutes from './routes/userRoutes';
 
@@ -40,6 +41,7 @@ app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1', appointmentRoutes);
 app.use('/api/v1', lockRoutes);
+app.use('/api/v1', lockHistoryRoutes);
 
 // Error handling middleware
 app.use((err: Error, req: Request, res: Response) => {

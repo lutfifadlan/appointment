@@ -13,19 +13,21 @@ import { useAuth } from "@/hooks/useAuth";
 import { useRouter } from "next/navigation";
 import { AppointmentCRUD } from "@/components/AppointmentCRUD";
 import { LockManagement } from "@/components/LockManagement";
+import { LockProvider } from "@/lib/contexts/LockContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Appointment {
   id: string;
   title: string;
-  description?: string;
+  description: string;
   startDate: string;
   endDate: string;
-  status: "scheduled" | "completed" | "cancelled";
-  location?: string;
-  organizer?: string;
-  attendees?: string[];
-  version: number;
+  location: string | null;
+  organizer: string | null;
+  attendees: string[] | null;
+  status: 'scheduled' | 'completed' | 'cancelled';
+  createdAt: string;
+  updatedAt: string;
 }
 
 export default function Dashboard() {
@@ -189,7 +191,6 @@ export default function Dashboard() {
             <TabsContent value="appointments" className="space-y-6 flex-1 overflow-y-auto">
               <AppointmentCRUD
                 userId={user?.id || ""}
-                userName={user?.name || ""}
                 onAppointmentSelect={handleAppointmentSelect}
                 selectedAppointmentId={selectedAppointment?.id}
               />
@@ -197,14 +198,19 @@ export default function Dashboard() {
 
             {/* Lock Management Tab */}
             <TabsContent value="locks" className="space-y-6 flex-1 overflow-y-auto">
-              <LockManagement
-                selectedAppointmentId={selectedAppointment?.id}
+              <LockProvider
+                appointmentId={selectedAppointment?.id}
                 userId={user?.id || ""}
-                userName={user?.name || ""}
-                userEmail={user?.email || ""}
-                userColor={userColor}
-                isAdmin={isAdmin}
-              />
+              >
+                <LockManagement
+                  selectedAppointmentId={selectedAppointment?.id}
+                  userId={user?.id || ""}
+                  userName={user?.name || ""}
+                  userEmail={user?.email || ""}
+                  userColor={userColor}
+                  isAdmin={isAdmin}
+                />
+              </LockProvider>
             </TabsContent>
           </Tabs>
 

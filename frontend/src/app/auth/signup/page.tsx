@@ -66,7 +66,7 @@ const SignUp: React.FC = () => {
       });
 
       if (res.ok) {
-        toast("Registered successfully! Please check your email to verify your account.");
+        toast("Registered successfully!");
         router.push('/auth/signin');
       } else {
         const data = await res.json();

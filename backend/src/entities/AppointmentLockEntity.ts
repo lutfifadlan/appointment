@@ -1,4 +1,4 @@
-import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, Index } from "typeorm";
+import { Entity, Column, PrimaryGeneratedColumn, CreateDateColumn, Index, VersionColumn } from "typeorm";
 
 @Entity("appointment_locks")
 export class AppointmentLockEntity {
@@ -30,4 +30,7 @@ export class AppointmentLockEntity {
     type: process.env.NODE_ENV === "test" ? "datetime" : "timestamp" 
   })
   expiresAt!: Date;
+
+  @VersionColumn()
+  version!: number;
 }
