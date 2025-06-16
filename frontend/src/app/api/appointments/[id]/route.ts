@@ -2,11 +2,12 @@ import { NextResponse } from 'next/server';
 
 export async function PUT(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const body = await request.json();
-    const response = await fetch(`${process.env.BACKEND_API_URL}/appointments/${params.id}`, {
+    const { id } = await params;
+    const response = await fetch(`${process.env.BACKEND_API_URL}/appointments/${id}`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json',
@@ -31,10 +32,11 @@ export async function PUT(
 
 export async function DELETE(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const response = await fetch(`${process.env.BACKEND_API_URL}/appointments/${params.id}`, {
+    const { id } = await params;
+    const response = await fetch(`${process.env.BACKEND_API_URL}/appointments/${id}`, {
       method: 'DELETE',
       headers: {
         'Content-Type': 'application/json',
@@ -57,10 +59,11 @@ export async function DELETE(
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const response = await fetch(`${process.env.BACKEND_API_URL}/appointments/${params.id}`, {
+    const { id } = await params;
+    const response = await fetch(`${process.env.BACKEND_API_URL}/appointments/${id}`, {
       headers: {
         'Content-Type': 'application/json',
       },
