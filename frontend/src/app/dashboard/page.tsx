@@ -3,19 +3,17 @@ import React, { useState, useEffect } from "react";
 import { Sidebar, SidebarBody, SidebarLink } from "@/components/ui/sidebar";
 import {
   IconArrowLeft,
-  IconSettings,
   IconReport,
   IconLock,
-  IconLockOpen,
-  IconUser,
 } from "@tabler/icons-react";
-import { motion } from "motion/react";
+import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import Image from "next/image";
-import { useAppointmentLock } from "@/hooks/useAppointmentLock";
 import { useAuth } from "@/hooks/useAuth";
-import { useSocket } from "@/hooks/useSocket";
 import { useRouter } from "next/navigation";
+import { AppointmentCRUD } from "@/components/AppointmentCRUD";
+import { LockManagement } from "@/components/LockManagement";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface Appointment {
   id: string;
@@ -32,21 +30,24 @@ interface Appointment {
 
 export default function Dashboard() {
   const router = useRouter();
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [activeTab, setActiveTab] = useState("appointments");
   const { user, isAdmin } = useAuth();
-  const { socket } = useSocket();
 
-  const {
-    lock,
-    isLoading: isLockLoading,
-    error: lockError,
-    acquireLock,
-    releaseLock,
-    forceReleaseLock,
-    hasLock,
-    isLocked,
-  } = useAppointmentLock(selectedAppointment?.id || "");
+  // Generate user color for collaborative features
+  const userColor = React.useMemo(() => {
+    if (!user?.id) return '#0ea5e9';
+    const colors = [
+      '#0ea5e9', '#737373', '#14b8a6', '#22c55e',
+      '#3b82f6', '#ef4444', '#eab308', '#f97316',
+      '#ec4899', '#8b5cf6', '#06b6d4', '#84cc16'
+    ];
+    let hash = 0;
+    for (let i = 0; i < user.id.length; i++) {
+      hash = ((hash << 5) - hash + user.id.charCodeAt(i)) & 0xffffffff;
+    }
+    return colors[Math.abs(hash) % colors.length];
+  }, [user?.id]);
 
   useEffect(() => {
     const fetchSession = async () => {
@@ -58,62 +59,31 @@ export default function Dashboard() {
       }
     };
     fetchSession();
+  }, [router]);
 
-    const fetchAppointments = async () => {
-      try {
-        const response = await fetch("/api/appointments");
-        const data = await response.json();
-        
-        // Check if data is an array
-        if (!Array.isArray(data)) {
-          console.error("Received invalid data format:", data);
-          setAppointments([]);
-          return;
-        }
-        
-        setAppointments(data);
-      } catch (error) {
-        console.error("Failed to fetch appointments:", error);
-        setAppointments([]);
-      }
-    };
-
-    fetchAppointments();
-  }, []);
-
-  useEffect(() => {
-    if (!socket || !selectedAppointment) return;
-
-    socket.on("appointment-update", (updatedAppointment: Appointment) => {
-      setAppointments((prev) =>
-        prev.map((apt) =>
-          apt.id === updatedAppointment.id ? updatedAppointment : apt
-        )
-      );
-    });
-
-    return () => {
-      socket.off("appointment-update");
-    };
-  }, [socket, selectedAppointment]);
-
-  const handleAppointmentSelect = async (appointment: Appointment) => {
+  const handleAppointmentSelect = (appointment: Appointment) => {
     setSelectedAppointment(appointment);
+    setActiveTab("locks"); // Switch to lock management when appointment is selected
   };
 
-  const handleLockToggle = async () => {
-    if (!selectedAppointment) return;
+  const handleLogout = async () => {
+    try {
+      const response = await fetch('/api/auth/logout', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
 
-    if (hasLock()) {
-      await releaseLock();
-    } else {
-      await acquireLock();
+      if (!response.ok) {
+        throw new Error('Failed to logout');
+      }
+
+      router.replace('/auth/signin');
+    } catch (error) {
+      console.error('Logout error:', error);
+      router.replace('/auth/signin');
     }
-  };
-
-  const handleForceRelease = async () => {
-    if (!selectedAppointment || !isAdmin) return;
-    await forceReleaseLock();
   };
 
   const links = [
@@ -125,18 +95,12 @@ export default function Dashboard() {
       ),
     },
     {
-      label: "Settings",
-      href: "#",
-      icon: (
-        <IconSettings className="h-5 w-5 shrink-0 text-neutral-700 dark:text-neutral-200" />
-      ),
-    },
-    {
       label: "Logout",
       href: "#",
       icon: (
         <IconArrowLeft className="h-5 w-5 shrink-0 text-neutral-700 dark:text-neutral-200" />
       ),
+      onClick: handleLogout,
     },
   ];
 
@@ -180,141 +144,70 @@ export default function Dashboard() {
       </Sidebar>
 
       <div className="flex flex-1">
-        <div className="flex h-full w-full flex-1 flex-col gap-2 rounded-tl-2xl border border-neutral-200 bg-white p-2 md:p-10 dark:border-neutral-700 dark:bg-neutral-900">
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {appointments.map((appointment) => (
-              <div
-                key={appointment.id}
-                className={cn(
-                  "cursor-pointer rounded-lg border p-4 transition-all hover:shadow-md",
-                  selectedAppointment?.id === appointment.id
-                    ? "border-blue-500 bg-blue-50 dark:bg-blue-900/20"
-                    : "border-neutral-200 dark:border-neutral-700"
-                )}
-                onClick={() => handleAppointmentSelect(appointment)}
-              >
-                <h3 className="font-semibold">{appointment.title}</h3>
-                <p className="text-sm text-neutral-600 dark:text-neutral-400">
-                  {new Date(appointment.startDate).toLocaleString()}
-                </p>
-                <div className="mt-2 flex items-center gap-2">
-                  <span
-                    className={cn(
-                      "rounded-full px-2 py-1 text-xs",
-                      appointment.status === "scheduled"
-                        ? "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400"
-                        : appointment.status === "completed"
-                        ? "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400"
-                        : "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400"
-                    )}
-                  >
-                    {appointment.status}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-
+        <div className="flex h-full w-full flex-1 flex-col gap-2 rounded-tl-2xl border border-neutral-200 bg-white p-2 md:p-10 dark:border-neutral-700 dark:bg-neutral-900 overflow-y-auto">
+          
+          {/* Selected Appointment Banner */}
           {selectedAppointment && (
-            <div className="mt-8 rounded-lg border border-neutral-200 p-6 dark:border-neutral-700">
-              <div className="mb-4 flex items-center justify-between">
-                <h2 className="text-2xl font-bold">{selectedAppointment.title}</h2>
-                <div className="flex items-center gap-4">
-                  {isLocked && (
-                    <div className="flex items-center gap-2 text-sm text-neutral-600 dark:text-neutral-400">
-                      <IconUser className="h-4 w-4" />
-                      <span>
-                        Locked by: {lock?.userInfo.name} (
-                        {new Date(lock!.expiresAt).toLocaleTimeString()})
-                      </span>
-                    </div>
-                  )}
-                  <button
-                    onClick={handleLockToggle}
-                    disabled={isLockLoading}
-                    className={cn(
-                      "flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors",
-                      hasLock()
-                        ? "bg-red-100 text-red-800 hover:bg-red-200 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/30"
-                        : "bg-blue-100 text-blue-800 hover:bg-blue-200 dark:bg-blue-900/20 dark:text-blue-400 dark:hover:bg-blue-900/30"
-                    )}
-                  >
-                    {hasLock() ? (
-                      <>
-                        <IconLockOpen className="h-4 w-4" />
-                        Release Lock
-                      </>
-                    ) : (
-                      <>
-                        <IconLock className="h-4 w-4" />
-                        Acquire Lock
-                      </>
-                    )}
-                  </button>
-                  {isAdmin && isLocked && !hasLock() && (
-                    <button
-                      onClick={handleForceRelease}
-                      className="flex items-center gap-2 rounded-md bg-yellow-100 px-4 py-2 text-sm font-medium text-yellow-800 transition-colors hover:bg-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-400 dark:hover:bg-yellow-900/30"
-                    >
-                      Force Release
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {lockError && (
-                <div className="mb-4 rounded-md bg-red-100 p-4 text-sm text-red-800 dark:bg-red-900/20 dark:text-red-400">
-                  {lockError}
-                </div>
-              )}
-
-              <div className="grid gap-6 md:grid-cols-2">
+            <div className="mb-6 rounded-lg border-l-4 border-l-blue-500 bg-blue-50 p-4 dark:bg-blue-900/20">
+              <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="mb-2 font-semibold">Details</h3>
-                  <div className="space-y-2">
-                    <p>
-                      <span className="font-medium">Start:</span>{" "}
-                      {new Date(selectedAppointment.startDate).toLocaleString()}
-                    </p>
-                    <p>
-                      <span className="font-medium">End:</span>{" "}
-                      {new Date(selectedAppointment.endDate).toLocaleString()}
-                    </p>
-                    <p>
-                      <span className="font-medium">Location:</span>{" "}
-                      {selectedAppointment.location || "N/A"}
-                    </p>
-                    <p>
-                      <span className="font-medium">Organizer:</span>{" "}
-                      {selectedAppointment.organizer || "N/A"}
-                    </p>
-                  </div>
-                </div>
-                <div>
-                  <h3 className="mb-2 font-semibold">Description</h3>
-                  <p className="text-neutral-600 dark:text-neutral-400">
-                    {selectedAppointment.description || "No description provided"}
+                  <h3 className="font-semibold text-lg">{selectedAppointment.title}</h3>
+                  <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                    {new Date(selectedAppointment.startDate).toLocaleString()} • {selectedAppointment.location}
                   </p>
                 </div>
+                <span
+                  className={cn(
+                    "rounded-full px-3 py-1 text-sm font-medium",
+                    selectedAppointment.status === "scheduled"
+                      ? "bg-green-100 text-green-800 dark:bg-green-900/20 dark:text-green-400"
+                      : selectedAppointment.status === "completed"
+                      ? "bg-blue-100 text-blue-800 dark:bg-blue-900/20 dark:text-blue-400"
+                      : "bg-red-100 text-red-800 dark:bg-red-900/20 dark:text-red-400"
+                  )}
+                >
+                  {selectedAppointment.status}
+                </span>
               </div>
-
-              {selectedAppointment.attendees && selectedAppointment.attendees.length > 0 && (
-                <div className="mt-6">
-                  <h3 className="mb-2 font-semibold">Attendees</h3>
-                  <div className="flex flex-wrap gap-2">
-                    {selectedAppointment.attendees.map((attendee, index) => (
-                      <span
-                        key={index}
-                        className="rounded-full bg-neutral-100 px-3 py-1 text-sm dark:bg-neutral-800"
-                      >
-                        {attendee}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           )}
+
+          {/* Main Tabs */}
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6 flex-1 flex flex-col overflow-hidden">
+            <TabsList className="grid w-full grid-cols-2 lg:w-[400px]">
+              <TabsTrigger value="appointments" className="flex items-center gap-2">
+                <IconReport className="h-4 w-4" />
+                Appointment Management
+              </TabsTrigger>
+              <TabsTrigger value="locks" className="flex items-center gap-2">
+                <IconLock className="h-4 w-4" />
+                Lock Management
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Appointment CRUD Tab */}
+            <TabsContent value="appointments" className="space-y-6 flex-1 overflow-y-auto">
+              <AppointmentCRUD
+                userId={user?.id || ""}
+                userName={user?.name || ""}
+                onAppointmentSelect={handleAppointmentSelect}
+                selectedAppointmentId={selectedAppointment?.id}
+              />
+            </TabsContent>
+
+            {/* Lock Management Tab */}
+            <TabsContent value="locks" className="space-y-6 flex-1 overflow-y-auto">
+              <LockManagement
+                selectedAppointmentId={selectedAppointment?.id}
+                userId={user?.id || ""}
+                userName={user?.name || ""}
+                userEmail={user?.email || ""}
+                userColor={userColor}
+                isAdmin={isAdmin}
+              />
+            </TabsContent>
+          </Tabs>
+
         </div>
       </div>
     </div>
@@ -361,3 +254,4 @@ const LogoIcon = () => {
     </a>
   );
 };
+

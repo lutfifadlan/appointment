@@ -29,12 +29,14 @@ interface LockProviderProps {
   children: ReactNode;
   appointmentId?: string;
   userId?: string;
+  disabled?: boolean;
 }
 
 export const LockProvider: React.FC<LockProviderProps> = ({ 
   children, 
   appointmentId,
-  userId 
+  userId,
+  disabled = false
 }) => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const [isLocked, setIsLocked] = useState(false);
@@ -46,7 +48,7 @@ export const LockProvider: React.FC<LockProviderProps> = ({
 
   // Initialize WebSocket connection
   useEffect(() => {
-    if (!appointmentId) return;
+    if (!appointmentId || disabled) return;
 
     const newSocket = io(process.env.BACKEND_API_URL);
     setSocket(newSocket);
@@ -131,7 +133,7 @@ export const LockProvider: React.FC<LockProviderProps> = ({
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appointmentId, userId]);
+  }, [appointmentId, userId, disabled]);
 
   // Auto-refresh lock every 4 minutes to prevent expiration (which happens at 5 minutes)
   useEffect(() => {
@@ -175,7 +177,7 @@ export const LockProvider: React.FC<LockProviderProps> = ({
       setLockLoading(true);
       setLockError(null);
       
-      const response = await fetch(`${process.env.BACKEND_API_URL}/appointments/${appointmentId}/lock-status`);
+      const response = await fetch(`/api/appointments/${appointmentId}/lock-status`);
       const data = await response.json();
       
       if (data.lock) {
@@ -205,6 +207,7 @@ export const LockProvider: React.FC<LockProviderProps> = ({
     userId: string, 
     userInfo: { name: string; email: string }
   ): Promise<boolean> => {
+    if (disabled) return false;
     try {
       setLockLoading(true);
       setLockError(null);
@@ -238,6 +241,7 @@ export const LockProvider: React.FC<LockProviderProps> = ({
   };
 
   const releaseLock = async (appointmentId: string, userId: string): Promise<boolean> => {
+    if (disabled) return false;
     try {
       setLockLoading(true);
       setLockError(null);
@@ -271,6 +275,7 @@ export const LockProvider: React.FC<LockProviderProps> = ({
   };
 
   const forceReleaseLock = async (appointmentId: string, adminId: string): Promise<boolean> => {
+    if (disabled) return false;
     try {
       setLockLoading(true);
       setLockError(null);
@@ -308,6 +313,7 @@ export const LockProvider: React.FC<LockProviderProps> = ({
     userId: string, 
     position: { x: number; y: number }
   ): Promise<void> => {
+    if (disabled) return;
     try {
       // Update position via WebSocket for real-time updates
       if (socket) {

@@ -1,53 +1,36 @@
 import React from 'react';
-import { motion } from 'framer-motion';
 
-interface FollowingPointerProps {
+export interface FollowingPointerProps {
+  userId: string;
+  userName: string;
   x: number;
   y: number;
-  userName: string;
-  color?: string;
+  color: string;
 }
 
-export const FollowingPointer: React.FC<FollowingPointerProps> = ({ 
-  x, 
-  y, 
+const FollowingPointer: React.FC<FollowingPointerProps> = ({
   userName,
-  color = '#3b82f6' // Default blue color
+  x,
+  y,
+  color
 }) => {
   return (
-    <motion.div
-      className="pointer-events-none fixed top-0 left-0 z-50"
-      animate={{ x, y }}
-      transition={{
-        type: 'spring',
-        damping: 30,
-        stiffness: 200,
-        mass: 0.5
+    <div
+      className="pointer-events-none fixed z-50 transition-transform"
+      style={{
+        transform: `translate(${x}px, ${y}px)`,
       }}
     >
-      {/* Cursor pointer */}
-      <svg
-        width="24"
-        height="24"
-        viewBox="0 0 24 24"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <path
-          d="M5.65376 12.3673H5.46026L5.31717 12.4976L0.500002 16.8829L0.500002 1.19841L11.7841 12.3673H5.65376Z"
-          fill={color}
-          stroke="white"
+      <div className="relative">
+        <div
+          className="absolute -left-1 -top-1 h-3 w-3 rounded-full border-2 border-white"
+          style={{ backgroundColor: color }}
         />
-      </svg>
-
-      {/* User name tag */}
-      <div
-        className="absolute top-5 left-2 rounded-md px-2 py-1 text-xs font-medium text-white shadow-sm"
-        style={{ backgroundColor: color, maxWidth: '150px' }}
-      >
-        <p className="truncate">{userName}</p>
+        <div className="absolute left-2 top-2 whitespace-nowrap rounded-full bg-white px-2 py-1 text-xs font-medium text-gray-900 shadow-sm">
+          {userName}
+        </div>
       </div>
-    </motion.div>
+    </div>
   );
 };
 

@@ -3,6 +3,8 @@ import websocketService from './websocketService';
 import { AppDataSource } from '../config/data-source';
 import { AppointmentLockEntity } from '../entities/AppointmentLockEntity';
 import { LessThan, MoreThan, Repository } from 'typeorm';
+import lockHistoryService from './lockHistoryService';
+import { LockAction } from '../entities/LockHistoryEntity';
 
 export interface IWebsocketService {
   notifyLockAcquired: (appointmentId: string, lock: AppointmentLock) => void;
@@ -29,6 +31,41 @@ export class LockService {
    */
   private async cleanupExpiredLocks(appointmentId: string): Promise<void> {
     const now = new Date();
+    
+    // Find expired locks before deleting them to record in history
+    const expiredLocks = await this.lockRepository.find({
+      where: {
+        appointmentId,
+        expiresAt: LessThan(now)
+      }
+    });
+    
+    // Record expired locks in history
+    for (const lock of expiredLocks) {
+      try {
+        const duration = Math.floor((now.getTime() - lock.createdAt.getTime()) / 1000);
+        await lockHistoryService.recordLockAction(
+          appointmentId,
+          lock.userId,
+          lock.userInfo.name,
+          lock.userInfo.email,
+          LockAction.EXPIRED,
+          {
+            duration,
+            lockId: lock.id,
+            metadata: {
+              userAgent: 'backend-service',
+              sessionId: lock.id,
+              expiredAt: now.toISOString()
+            }
+          }
+        );
+      } catch (error) {
+        console.error('Failed to record expired lock in history:', error);
+      }
+    }
+    
+    // Delete expired locks
     await this.lockRepository.delete({
       appointmentId,
       expiresAt: LessThan(now)
@@ -110,6 +147,7 @@ export class LockService {
     
     // If there's an existing lock by the same user, update it
     let lockEntity: AppointmentLockEntity;
+    let isNewLock = false;
     
     if (existingLock) {
       existingLock.expiresAt = expiresAt;
@@ -127,9 +165,33 @@ export class LockService {
       
       // Save to database
       lockEntity = await this.lockRepository.save(lockEntity);
+      isNewLock = true;
     }
     
     const lock = this.entityToLock(lockEntity);
+    
+    // Record lock acquisition in history (only for new locks)
+    if (isNewLock) {
+      try {
+        await lockHistoryService.recordLockAction(
+          appointmentId,
+          userId,
+          userInfo.name,
+          userInfo.email,
+          LockAction.ACQUIRED,
+          {
+            lockId: lockEntity.id,
+            metadata: {
+              userAgent: 'backend-service', // In a real app, we'd get this from request headers
+              sessionId: lockEntity.id
+            }
+          }
+        );
+      } catch (error) {
+        console.error('Failed to record lock acquisition in history:', error);
+        // Don't fail the lock acquisition if history recording fails
+      }
+    }
     
     // Notify clients about the lock acquisition
     this.websocketService.notifyLockAcquired(appointmentId, lock);
@@ -166,6 +228,30 @@ export class LockService {
       };
     }
 
+    // Calculate duration before removing the lock
+    const duration = Math.floor((new Date().getTime() - lock.createdAt.getTime()) / 1000);
+    
+    // Record lock release in history
+    try {
+      await lockHistoryService.recordLockAction(
+        appointmentId,
+        userId,
+        lock.userInfo.name,
+        lock.userInfo.email,
+        LockAction.RELEASED,
+        {
+          duration,
+          lockId: lock.id,
+          metadata: {
+            userAgent: 'backend-service',
+            sessionId: lock.id
+          }
+        }
+      );
+    } catch (error) {
+      console.error('Failed to record lock release in history:', error);
+    }
+
     // Release the lock by removing it from the database
     await this.lockRepository.remove(lock);
 
@@ -192,6 +278,32 @@ export class LockService {
         success: false,
         message: 'Appointment is not locked',
       };
+    }
+
+    // Calculate duration before removing the lock
+    const duration = Math.floor((new Date().getTime() - lock.createdAt.getTime()) / 1000);
+    
+    // Record force release in history
+    try {
+      await lockHistoryService.recordLockAction(
+        appointmentId,
+        lock.userId,
+        lock.userInfo.name,
+        lock.userInfo.email,
+        LockAction.FORCE_RELEASED,
+        {
+          duration,
+          releasedBy: adminId,
+          lockId: lock.id,
+          metadata: {
+            userAgent: 'backend-service',
+            sessionId: lock.id,
+            adminAction: true
+          }
+        }
+      );
+    } catch (error) {
+      console.error('Failed to record force release in history:', error);
     }
 
     // Release the lock by removing it from the database

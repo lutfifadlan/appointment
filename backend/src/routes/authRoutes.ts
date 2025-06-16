@@ -11,6 +11,6 @@ router.post('/signin', authController.signin);
 router.get('/validate-token', authController.validateToken);
 
 // Protected routes
-router.get('/me', authMiddleware, authController.getCurrentUser);
+router.get('/session', authMiddleware, authController.getCurrentUser);
 
 export default router;

@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { Common, Document } from "@/constants";
 import Providers from "./providers";
 import { Toaster } from "sonner";
+import { WebSocketProvider } from '@/lib/websocket';
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"),
@@ -40,9 +41,11 @@ export default function RootLayout({
         <link href={Document.fontUrl} rel="stylesheet" />
       </head>
       <body className="font-display">
-        <Providers>
-          {children}
-        </Providers>
+        <WebSocketProvider>
+          <Providers>
+            {children}
+          </Providers>
+        </WebSocketProvider>
         <Toaster />
       </body>
     </html>

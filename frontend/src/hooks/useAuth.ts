@@ -14,7 +14,7 @@ export const useAuth = () => {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const response = await fetch('/api/auth/me');
+        const response = await fetch('/api/auth/session');
         if (response.ok) {
           const userData = await response.json();
           setUser(userData);
